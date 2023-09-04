@@ -104,15 +104,9 @@ void set_sizes(TreeNode* root) {
 }
 
 void filter_max_size(TreeNode* root, int max_size, std::vector<TreeNode*>& nodes) {
-    if (root == nullptr) {
+    if (root == nullptr || root->child == nullptr) {
         return;
-    }
-
-    if (root->child == nullptr) {
-        return;
-    }
-
-    if (root->size <= max_size) {
+    } else if (root->size <= max_size) {
         nodes.push_back(root);
     }
 
