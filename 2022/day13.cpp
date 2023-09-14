@@ -33,13 +33,27 @@ struct List {
         // created a linked list of each element
         List* cur = nullptr;
         std::string str;
+        int counter = 1;
         while (++index < length) {
-            if (data[index] == ',') {
+            if (data[index] == '[') {
+                ++counter;
+            } else if (data[index] == ']') {
+                --counter;
+            }
+            if (data[index] == ',' && counter == 1) {
                 if (cur == nullptr) {
-                    cur = new List(str);
+                    List* tmp = new List(str);
+                    if (str.front() == '[' && str.back() == ']') {
+                        tmp = new List(tmp);
+                    }
+                    cur = tmp;
                     next = cur;
                 } else {
-                    cur->next = new List(str);
+                    List* tmp = new List(str);
+                    if (str.front() == '[' && str.back() == ']') {
+                        tmp = new List(tmp);
+                    }
+                    cur->next = tmp;
                     cur = cur->next;
                 }
                 str = "";
@@ -51,12 +65,23 @@ struct List {
         // add the last element
         if (!str.empty()) {
             if (cur == nullptr) {
-                cur = new List(str);
+                List* tmp = new List(str);
+                if (str.front() == '[' && str.back() == ']') {
+                    tmp = new List(tmp);
+                }
+                cur = tmp;
                 next = cur;
             } else {
-                cur->next = new List(str);
+                List* tmp = new List(str);
+                if (str.front() == '[' && str.back() == ']') {
+                    tmp = new List(tmp);
+                }
+                cur->next = tmp;
                 cur = cur->next;
             }
+        }
+        if (next != nullptr) {
+            *this = *next;
         }
     }
 
@@ -64,7 +89,7 @@ struct List {
         // both are int:
         if (is_int() && other.is_int()) {
             if (data == other.data) {
-                return next < other.next;
+                return *next < *other.next;
             }
             return data < other.data;
         }
@@ -114,7 +139,7 @@ struct List {
     bool operator==(const List& other) const {
         // both are int:
         if (is_int() && other.is_int()) {
-            return data == other.data;
+            return data == other.data && (*next == *other.next);
         }
         
         // one is a list:
@@ -126,7 +151,7 @@ struct List {
             return out;
         } else if (is_list() && other.is_int()) {
             List cmp = List {new List{other.data}};
-            bool out = *this < cmp;
+            bool out = *this == cmp;
             delete cmp.list;
             return out;
         }
@@ -140,7 +165,7 @@ struct List {
         while (true) {
             // check for empties
             if (it_this == nullptr && it_other == nullptr) {
-                return true;
+                return *next == *other.next;
             } else if (it_this == nullptr || it_other == nullptr) {
                 return false;
             }
@@ -148,7 +173,7 @@ struct List {
             // both are non-empty =========
             // check both are ints
             if (it_this->is_int() && it_other->is_int()) {
-                return it_this->data == it_other->data;
+                return (it_this->data == it_other->data) && (it_this->next == it_other->next) && (*next == *other.next);
             }
 
             // check both are lists
@@ -164,12 +189,12 @@ struct List {
             // otherwise cast to same type and try again
             if (it_this->is_int()) {
                 List cmp = List {new List{it_this->data}};
-                bool out = cmp < *it_other;
+                bool out = cmp == *it_other;
                 delete cmp.list;
                 return out;
             }
             List cmp = List {new List{it_other->data}};
-            bool out = *it_this < cmp;
+            bool out = *it_this == cmp;
             delete cmp.list;
             return out;
         }
@@ -191,9 +216,9 @@ struct List {
         return next == nullptr && list == nullptr;
     }
 
-    List(List& other) = delete;
-    List& operator=(List& other) = delete;
-    List& operator=(List&& other) = delete;
+    List(List& other) = default;
+    List& operator=(List& other) = default;
+    List& operator=(List&& other) = default;
     List(List&& other) {
         std::swap(list, other.list);
         std::swap(next, other.next);
@@ -228,8 +253,11 @@ void part_one() {
 
     // loop through pairs and add to index if a < b
     for (std::size_t i = 0 ; i < data.size() / 2; ++i) {
-        if (data[2 * i].next < data[2 * i + 1].next) {
+        std::cout << i << '\n';
+        std::cout << "equal " << (data[2 * i] == data[2 * i + 1]) << '\n';
+        if (data[2 * i] < data[2 * i + 1]) {
             index_sum += i + 1;
+            std::cout << "good " << i << "\n";
         }
     }
 
