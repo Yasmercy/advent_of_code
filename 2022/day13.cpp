@@ -15,6 +15,7 @@ struct List {
     List* next = nullptr;
 
     List() = default;
+    List(int data, List* list, List* next) : data(data), list(list), next(next) {}
     explicit List(int data) : data(data) {}
     explicit List(List* list) : list(list) {}
     explicit List(const std::string& data) {
@@ -86,117 +87,71 @@ struct List {
     }
 
     bool operator<(const List& other) const {
-        // both are int:
-        if (is_int() && other.is_int()) {
-            if (data == other.data) {
-                return *next < *other.next;
-            }
-            return data < other.data;
-        }
-        
-        // one is a list:
-        // upgrade one to list and try again
-        if (is_int() && other.is_list()) {
-            List cmp = List {new List(data)};
-            bool out = cmp < other;
-            return out;
-        } else if (is_list() && other.is_int()) {
-            List cmp = List {new List(other.data)};
-            bool out = *this < cmp;
-            return out;
-        }
+        const List* it_this = this;
+        const List* it_other = &other;
 
-        // both are lists
-        // zip values together
-        List* it_this = list;
-        List* it_other = other.list;
-
-        // iterate
         while (true) {
-            // check for empties
-            if (it_this == nullptr && it_other == nullptr) {
-                return false;
-            } else if (it_this == nullptr) {
-                return false;
+            if (it_this == nullptr) {
+                return it_other != nullptr;
             } else if (it_other == nullptr) {
-                return true;
+                return false;
             }
 
-            // both are non-empty =========
-
-            // check if they are equal
-            if (*it_this == *it_other) {
+            // do a comparison on the current element
+            List cur_this {it_this->data, it_this->list, nullptr};
+            List cur_other {it_other->data, it_other->list, nullptr};
+            bool eq = cur_this == cur_other;
+            // manually delete so no double free
+            cur_this.list = nullptr;
+            cur_other.list = nullptr;
+            if (eq) {
                 it_this = it_this->next;
                 it_other = it_other->next;
                 continue;
             }
 
-            // return whether this element is lt or gt
+            // found the element that is not equal
+            if (it_this->is_int() && it_other->is_int() && (it_this->data != it_other->data)) {
+                return it_this->data < it_other->data;
+            }
+
+            // traverse up the list, comparing elements
+            if (it_this->data == -1 && it_this->list == nullptr) {
+                return true;
+            } else if (it_other->data == -1 && it_other->list == nullptr) {
+                return false;
+            }
+
+            if (it_this->is_list()) {
+                it_this = it_this->list;
+            }
+            if (it_other->is_list()){
+                it_other = it_other->list;
+            }
             return *it_this < *it_other;
         }
     }
  
     bool operator==(const List& other) const {
-        // both are int:
-        if (is_int() && other.is_int()) {
-            return data == other.data && (*next == *other.next);
-        }
-        
-        // one is a list:
-        // upgrade one to list and try again
-        if (is_int() && other.is_list()) {
-            List cmp = List {new List{data}};
-            bool out = cmp < other;
-            delete cmp.list;
-            return out;
-        } else if (is_list() && other.is_int()) {
-            List cmp = List {new List{other.data}};
-            bool out = *this == cmp;
-            delete cmp.list;
-            return out;
-        }
-        
-        // both are lists
-        // zip values together
-        List* it_this = list;
-        List* it_other = other.list;
+        // check each corresponding element is correct
+        const List* it_this = this;
+        const List* it_other = &other;
 
-        // iterate
         while (true) {
-            // check for empties
+            // check for null conditions
             if (it_this == nullptr && it_other == nullptr) {
-                return *next == *other.next;
+                return true;
             } else if (it_this == nullptr || it_other == nullptr) {
                 return false;
             }
 
-            // both are non-empty =========
-            // check both are ints
-            if (it_this->is_int() && it_other->is_int()) {
-                return (it_this->data == it_other->data) && (it_this->next == it_other->next) && (*next == *other.next);
+            // check each element is equal
+            if ((it_this->data != it_other->data) || (*it_this->list != *it_other->list)) {
+                return false;
             }
 
-            // check both are lists
-            if (it_this->is_list() && it_this->is_list()) {
-                if (*it_this != *it_other) {
-                    return false;
-                }
-                it_this = it_this->next;
-                it_other = it_other->next;
-                continue;
-            }
-
-            // otherwise cast to same type and try again
-            if (it_this->is_int()) {
-                List cmp = List {new List{it_this->data}};
-                bool out = cmp == *it_other;
-                delete cmp.list;
-                return out;
-            }
-            List cmp = List {new List{it_other->data}};
-            bool out = *it_this == cmp;
-            delete cmp.list;
-            return out;
+            it_this = it_this->next;
+            it_other = it_other->next;
         }
     }
 
@@ -253,11 +208,8 @@ void part_one() {
 
     // loop through pairs and add to index if a < b
     for (std::size_t i = 0 ; i < data.size() / 2; ++i) {
-        std::cout << i << '\n';
-        std::cout << "equal " << (data[2 * i] == data[2 * i + 1]) << '\n';
         if (data[2 * i] < data[2 * i + 1]) {
             index_sum += i + 1;
-            std::cout << "good " << i << "\n";
         }
     }
 
