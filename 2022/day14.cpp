@@ -159,15 +159,11 @@ void part_two()
     const Sand start = Sand{0, 500};
     Sand cur = start;
 
-    while (!b.rest(start))
+    while (!b.abyss(cur) && !b.rest(start))
     {
         b.iterate_sand(cur);
         if (b.rest(cur))
         {
-            std::cout << cur.r << " " << cur.c << " ";
-            if (num % 50 == 0) {
-                std::cout << "\n";
-            }
             ++num;
             b.set(cur);
             cur = start;
