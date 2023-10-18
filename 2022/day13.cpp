@@ -82,7 +82,7 @@ struct List {
             }
         }
         if (next != nullptr) {
-            *this = *next;
+            *this = std::move(*next);
         }
     }
 
@@ -171,9 +171,16 @@ struct List {
         return next == nullptr && list == nullptr;
     }
 
-    List(List& other) = default;
-    List& operator=(List& other) = default;
-    List& operator=(List&& other) = default;
+    List(List& other) = delete;
+    List& operator=(List& other) = delete;
+
+    List& operator=(List&& other) {
+        std::swap(list, other.list);
+        std::swap(next, other.next);
+        std::swap(data, other.data);
+        return *this;
+    }
+
     List(List&& other) {
         std::swap(list, other.list);
         std::swap(next, other.next);
@@ -216,6 +223,23 @@ void part_one() {
     std::cout << index_sum << '\n';
 }
 
+void part_two() {
+    std::vector<List> data = process_file("day13.in");
+    List divider1("[[2]]");
+    List divider2("[[6]]");
+
+    // count # less than divider1
+    // count # less than divider2
+    int c1 = 1;
+    int c2 = 2; // divider1 is less
+    for (const auto& l : data) {
+        c1 += l < divider1;
+        c2 += l < divider2;
+    }
+    std::cout << c1 * c2 << "\n";
+}
+
 int main() {
     part_one();
+    part_two();
 }
