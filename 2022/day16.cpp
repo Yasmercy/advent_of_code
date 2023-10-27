@@ -51,17 +51,18 @@ int solve(const TunnelData &data)
         for (int i = 0; i < N; ++i)
         {
             // for each node j
-            // todo: maybe swap this to p (prev) (default 0 for everything)
             for (int j = 0; j < N; ++j)
             {
                 // max with b = 0
                 // max of any previous node p that incomes to node i
-                // max { dp[p][j][t+1][1], dp[i][i][t+1][0] + (t * v[i]) if i != j}
+                // max turning on if j != i
+                // max { dp[p][j][t+1][0] }
                 dp[i][j][t][0] = dp[i][j][t + 1][0];
                 for (int p : data.adjList[i])
                     dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[p][j][t + 1][0]);
                 if (i != j)
-                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[i][j][t + 1][0] + data.values[i] * t);
+                    // WRONG, i could have been already activated
+                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[i][j][t + 1][0] + t * data.values[i]);
 
                 // max with b = 1
                 // max of activating it from previous time
@@ -70,6 +71,7 @@ int solve(const TunnelData &data)
                 dp[i][j][t][1] = dp[i][j][t + 1][1];
                 for (int p : data.adjList[i])
                     dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[p][j][t + 1][1]);
+                // WRONG, j might not be active here (minor)
                 dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[i][i][t + 1][0] + t * data.values[i]);
             }
         }
