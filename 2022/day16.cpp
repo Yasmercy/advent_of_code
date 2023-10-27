@@ -7,24 +7,7 @@
 #include <vector>
 
 constexpr size_t N = 10;
-constexpr int T = 30;
-
-/*
- * S: N x N x 2 x t subproblems
- * s[i][j][t][b] = maximum value given that at time t,
- *      you are at node i and node j is b (true or false)
- * R:
- *  max of:
- *      activating that node (flow_rate * time)
- *          (at i, when i was not active before)
- *      go to i from any previous node j -> i
- *          (that j is not active)
- *
- * T: t: 0->t, fill out all NxN array in any order
- * B: s[i][j][0] = 0 for all i, j
- * O: max {s['AA'][j][0][b] for all j, b}
- * T: N x N x 2 x t
- */
+constexpr int T = 4;
 
 struct TunnelData
 {
@@ -36,54 +19,44 @@ struct TunnelData
 
 int solve(const TunnelData &data)
 {
-    int dp[N][N][T + 1][2];
+    int dp[T + 1][N][N + 1];
 
     // base case: at time t, maximum score is 0
     for (int i = 0; i < N; ++i)
-        for (int j = 0; j < N; ++j)
+        for (int j = 0; j <= N; ++j)
             for (int b = 0; b < 2; ++b)
-                dp[i][j][T][b] = 0;
+                dp[T][i][j] = 0;
+    // base case 2: using no nodes, maximum score is 0
+    for (int i = 0; i < N; ++i)
+        for (int t = 0; t <= T; ++t)
+            dp[t][i][0] = 0;
 
-    // for each time step
+    // while at time = t
     for (int t = T - 1; t >= 0; --t)
     {
-        // for each node i
+        // while sitting at node = i
         for (int i = 0; i < N; ++i)
         {
-            // for each node j
-            for (int j = 0; j < N; ++j)
+            // by including node j - 1
+            for (int j = 1; j <= N; ++j)
             {
-                // max with b = 0
-                // max of any previous node p that incomes to node i
-                // max turning on if j != i
-                // max { dp[p][j][t+1][0] }
-                dp[i][j][t][0] = dp[i][j][t + 1][0];
-                for (int p : data.adjList[i])
-                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[p][j][t + 1][0]);
-                if (i != j)
-                    // WRONG, i could have been already activated
-                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[i][j][t + 1][0] + t * data.values[i]);
+                // worst case, just copy what we were at a time before,
+                // or when we did not include j
+                dp[t][i][j] = std::max(dp[t + 1][i][j], dp[t][i][j - 1]);
 
-                // max with b = 1
-                // max of activating it from previous time
-                // max of any previous node p that incomes to node i
-                // max { dp[p][j][t+1][1], dp[i][i][t+1][0] + (t * v[i]) }
-                dp[i][j][t][1] = dp[i][j][t + 1][1];
-                for (int p : data.adjList[i])
-                    dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[p][j][t + 1][1]);
-                // WRONG, j might not be active here (minor)
-                dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[i][i][t + 1][0] + t * data.values[i]);
+                // if we are sitting on j, we can turn valve j on
+                if (i == j - 1)
+                    dp[t][i][j] = std::max(dp[t][i][j], dp[t + 1][i][j - 1] + (T - t) * data.values[i]);
+                // else we max all states that we could've been before i
+                else
+                    for (int p : data.adjList[i])
+                        dp[t][i][j] = std::max(dp[t][i][j], dp[t + 1][p][j]);
             }
         }
     }
 
-    int sol = 0;
-    // solve original problem: i = start, t = 0
-    for (int j = 0; j < N; ++j)
-        for (int b = 0; b < 2; ++b)
-            sol = std::max(sol, dp[data.start][j][0][b]);
-
-    return sol;
+    // solve original problem: t = 0, i = start, j = N
+    return dp[0][data.start][N];
 }
 
 TunnelData read_file(std::string filename)
@@ -123,10 +96,6 @@ TunnelData read_file(std::string filename)
             if (auto search = nodes.find(name); search == nodes.end())
             {
                 nodes[name] = nodes.size();
-            }
-            if (nodes[name] == 11)
-            {
-                std::cout << nodes[name] << std::endl;
             }
             out.adjList[nodes[name]].push_back(start);
         }
