@@ -9,7 +9,8 @@ constexpr long long N = 5;
 
 struct Pieces
 {
-    Pieces(long long row, long long col, long long width, long long height, std::vector<std::pair<long long, long long>> rel_locations)
+    Pieces(long long row, long long col, long long width, long long height,
+           std::vector<std::pair<long long, long long>> rel_locations)
         : row(row), col(col), width(width), height(height), rel_locations(rel_locations)
     {
     }
@@ -25,18 +26,42 @@ struct Board
     // a row x col representation
     std::vector<std::vector<long long>> board;
     long long height = 0;
+    long long cleared_height = 0;
 
     void setDefault(Pieces &piece)
     {
         // puts the row and col of the pieces in the right place
         piece.col = 2;
         piece.row = height + 3;
+
+        while ((board.size() + cleared_height) <= piece.row + piece.height)
+        {
+            board.push_back(std::vector<long long>(width, 0));
+        }
     }
 
     void setPiece(const Pieces &piece)
     {
         for (const auto &[r, c] : piece.rel_locations)
-            board[r + piece.row][c + piece.col] = 1;
+            board[r + piece.row - cleared_height][c + piece.col] = 1;
+
+        // check for creating full rows
+        for (long long r = piece.row + piece.height; r >= piece.row; --r)
+        {
+            int c = 0;
+            for (; c < width; ++c)
+            {
+                if (!board[r - cleared_height][c])
+                    break;
+            }
+            if (c == width)
+            {
+                auto diff = r - cleared_height;
+                cleared_height = r;
+                board.erase(board.begin(), board.begin() + diff);
+                return;
+            }
+        }
     }
 
     bool canMove(Pieces &piece, long long dr, long long dc)
@@ -45,7 +70,7 @@ struct Board
         {
             long long r_new = r + dr + piece.row;
             long long c_new = c + dc + piece.col;
-            if (0 > r_new || 0 > c_new || c_new >= width || board[r_new][c_new])
+            if (0 > r_new || 0 > c_new || c_new >= width || board[r_new - cleared_height][c_new])
                 return false;
         }
         return true;
@@ -78,6 +103,8 @@ struct Board
 
         while (piece_index < n)
         {
+            if (piece_index % (10'000'000) == 0)
+                std::cout << piece_index << "\n";
             auto &piece = pieces[piece_index % N];
 
             if (piece.row == -1)
@@ -109,7 +136,7 @@ struct Board
 
     void printArray()
     {
-        for (long long i = height - 1; i >= 0; --i)
+        for (long long i = height - 1 - cleared_height; i >= 0; --i)
             printRow(i);
         std::cout << "+------+\n\n";
     }
@@ -142,10 +169,8 @@ void part_one()
     };
 
     Board board;
-    board.board = std::vector<std::vector<long long>>(4000, std::vector<long long>(7, 0));
     std::vector<long long> directions = read_file("day17.in");
     board.run(2022, pieces, directions);
-    // board.prlong longArray();
 
     std::cout << board.height << "\n";
 }
@@ -162,10 +187,8 @@ void part_two()
     };
 
     Board board;
-    board.board = std::vector<std::vector<long long>>(4000, std::vector<long long>(7, 0));
     std::vector<long long> directions = read_file("day17.in");
-    board.run(1000000000000, pieces, directions);
-    // board.prlong longArray();
+    board.run(1'000'000'000'000, pieces, directions);
 
     std::cout << board.height << "\n";
 }
