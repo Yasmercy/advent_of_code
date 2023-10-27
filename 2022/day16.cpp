@@ -7,75 +7,81 @@
 #include <vector>
 
 constexpr size_t N = 10;
+constexpr int T = 30;
+
+/*
+ * S: N x N x 2 x t subproblems
+ * s[i][j][t][b] = maximum value given that at time t,
+ *      you are at node i and node j is b (true or false)
+ * R:
+ *  max of:
+ *      activating that node (flow_rate * time)
+ *          (at i, when i was not active before)
+ *      go to i from any previous node j -> i
+ *          (that j is not active)
+ *
+ * T: t: 0->t, fill out all NxN array in any order
+ * B: s[i][j][0] = 0 for all i, j
+ * O: max {s['AA'][j][0][b] for all j, b}
+ * T: N x N x 2 x t
+ */
 
 struct TunnelData
 {
+    // adj list stores all nodes with incoming edges (rather than outgoing for normal)
     std::vector<std::vector<size_t>> adjList = std::vector<std::vector<size_t>>(N);
-    std::vector<std::vector<size_t>> distances;
-    std::vector<size_t> values = std::vector<size_t>(N);
+    std::vector<int> values = std::vector<int>(N);
     size_t start = 0;
 };
 
-void allPairsShortestPaths(TunnelData &data)
+int solve(const TunnelData &data)
 {
-    std::vector<std::vector<size_t>> dist(N, std::vector<size_t>(N, std::numeric_limits<size_t>::max()));
-    for (size_t u = 0; u < N; ++u)
+    int dp[N][N][T + 1][2];
+
+    // base case: at time t, maximum score is 0
+    for (int i = 0; i < N; ++i)
+        for (int j = 0; j < N; ++j)
+            for (int b = 0; b < 2; ++b)
+                dp[i][j][T][b] = 0;
+
+    // for each time step
+    for (int t = T - 1; t >= 0; --t)
     {
-        for (const auto v : data.adjList[u])
+        // for each node i
+        for (int i = 0; i < N; ++i)
         {
-            dist[u][v] = 1;
-        }
-        dist[u][u] = 0;
-    }
-    for (size_t k = 0; k < N; ++k)
-    {
-        for (size_t i = 0; i < N; ++i)
-        {
-            for (size_t j = 0; j < N; ++j)
+            // for each node j
+            // todo: maybe swap this to p (prev) (default 0 for everything)
+            for (int j = 0; j < N; ++j)
             {
-                if (dist[i][k] != std::numeric_limits<size_t>::max() &&
-                    dist[k][j] != std::numeric_limits<size_t>::max())
-                {
-                    dist[i][j] = std::min(dist[i][j], dist[i][k] + dist[k][j]);
-                }
+                // max with b = 0
+                // max of any previous node p that incomes to node i
+                // max { dp[p][j][t+1][1], dp[i][i][t+1][0] + (t * v[i]) if i != j}
+                dp[i][j][t][0] = dp[i][j][t + 1][0];
+                for (int p : data.adjList[i])
+                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[p][j][t + 1][0]);
+                if (i != j)
+                    dp[i][j][t][0] = std::max(dp[i][j][t][0], dp[i][j][t + 1][0] + data.values[i] * t);
+
+                // max with b = 1
+                // max of activating it from previous time
+                // max of any previous node p that incomes to node i
+                // max { dp[p][j][t+1][1], dp[i][i][t+1][0] + (t * v[i]) }
+                dp[i][j][t][1] = dp[i][j][t + 1][1];
+                for (int p : data.adjList[i])
+                    dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[p][j][t + 1][1]);
+                dp[i][j][t][1] = std::max(dp[i][j][t][1], dp[i][i][t + 1][0] + t * data.values[i]);
             }
         }
     }
 
-    data.distances = dist;
-}
+    int sol = 0;
+    // solve original problem: i = start, t = 0
+    for (int j = 0; j < N; ++j)
+        for (int b = 0; b < 2; ++b)
+            sol = std::max(sol, dp[data.start][j][0][b]);
 
-size_t findMax(TunnelData &data, size_t time)
-{
-    size_t score = 0;
-    size_t cur = data.start;
-    while (time > 1)
-    {
-        // find the best next_node to go to
-        size_t best = 0;
-        size_t next_to = 0;
-        for (size_t i = 0; i < data.adjList.size(); ++i)
-        {
-            if (data.distances[cur][i] == 0 || (time <= data.distances[cur][i]))
-                continue;
-            size_t value = data.values[i] * (time - 1 - data.distances[cur][i]);
-            if (value > best)
-            {
-                best = value;
-                next_to = i;
-            }
-        }
-
-        score += best;
-        time -= data.distances[cur][next_to] + 1;
-        cur = next_to;
-        data.values[cur] = 0;
-        if (best == 0)
-        {
-            break;
-        }
-    }
-    return score;
+    return sol;
 }
 
 TunnelData read_file(std::string filename)
@@ -120,7 +126,7 @@ TunnelData read_file(std::string filename)
             {
                 std::cout << nodes[name] << std::endl;
             }
-            out.adjList[start].push_back(nodes[name]);
+            out.adjList[nodes[name]].push_back(start);
         }
     }
 
@@ -131,9 +137,8 @@ TunnelData read_file(std::string filename)
 void part_one()
 {
     auto data = read_file("day16.in");
-    allPairsShortestPaths(data);
-    size_t sol = findMax(data, 30);
-    std::cout << sol << "\n";
+    auto sol = solve(data);
+    std::cout << "part one solution: " << sol << std::endl;
 }
 
 int main()
