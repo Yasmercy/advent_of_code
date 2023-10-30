@@ -6,57 +6,121 @@
 #include <string>
 #include <vector>
 
-constexpr size_t N = 10;
-constexpr int T = 4;
+constexpr size_t N = 62;
+constexpr size_t T = 30;
 
 struct TunnelData
 {
     // adj list stores all nodes with incoming edges (rather than outgoing for normal)
     std::vector<std::vector<size_t>> adjList = std::vector<std::vector<size_t>>(N);
     std::vector<int> values = std::vector<int>(N);
+    std::vector<std::vector<size_t>> distances;
+    std::vector<int> reduced_mapping;
     size_t start = 0;
 };
 
-int solve(const TunnelData &data)
+void allPairsShortestPaths(TunnelData &data)
 {
-    int dp[T + 1][N][N + 1];
-
-    // base case: at time t, maximum score is 0
-    for (int i = 0; i < N; ++i)
-        for (int j = 0; j <= N; ++j)
-            for (int b = 0; b < 2; ++b)
-                dp[T][i][j] = 0;
-    // base case 2: using no nodes, maximum score is 0
-    for (int i = 0; i < N; ++i)
-        for (int t = 0; t <= T; ++t)
-            dp[t][i][0] = 0;
-
-    // while at time = t
-    for (int t = T - 1; t >= 0; --t)
+    std::vector<std::vector<size_t>> dist(N, std::vector<size_t>(N, std::numeric_limits<size_t>::max()));
+    for (size_t u = 0; u < N; ++u)
     {
-        // while sitting at node = i
-        for (int i = 0; i < N; ++i)
+        for (const auto v : data.adjList[u])
         {
-            // by including node j - 1
-            for (int j = 1; j <= N; ++j)
+            dist[u][v] = 1;
+        }
+        dist[u][u] = 0;
+    }
+    for (size_t k = 0; k < N; ++k)
+    {
+        for (size_t i = 0; i < N; ++i)
+        {
+            for (size_t j = 0; j < N; ++j)
             {
-                // worst case, just copy what we were at a time before,
-                // or when we did not include j
-                dp[t][i][j] = std::max(dp[t + 1][i][j], dp[t][i][j - 1]);
-
-                // if we are sitting on j, we can turn valve j on
-                if (i == j - 1)
-                    dp[t][i][j] = std::max(dp[t][i][j], dp[t + 1][i][j - 1] + (T - t) * data.values[i]);
-                // else we max all states that we could've been before i
-                else
-                    for (int p : data.adjList[i])
-                        dp[t][i][j] = std::max(dp[t][i][j], dp[t + 1][p][j]);
+                if (dist[i][k] != std::numeric_limits<size_t>::max() &&
+                    dist[k][j] != std::numeric_limits<size_t>::max())
+                {
+                    dist[i][j] = std::min(dist[i][j], dist[i][k] + dist[k][j]);
+                }
             }
         }
     }
 
-    // solve original problem: t = 0, i = start, j = N
-    return dp[0][data.start][N];
+    data.distances = dist;
+}
+
+TunnelData reduceGraph(const TunnelData &data)
+{
+    // removes all nodes with value = 0
+    std::vector<int> keep;
+    for (int i = 0; i < N; ++i)
+    {
+        if (data.values[i] != 0)
+            keep.push_back(i);
+    }
+
+    TunnelData out;
+
+    std::vector<std::vector<size_t>> distances(keep.size(), std::vector<size_t>(keep.size(), 0));
+    std::vector<int> values(keep.size(), 0);
+
+    for (int i = 0; i < keep.size(); ++i)
+    {
+        values[i] = data.values[keep[i]];
+        for (int j = 0; j < keep.size(); ++j)
+        {
+            distances[i][j] = data.distances[keep[i]][keep[j]];
+        }
+    }
+
+    out.distances = distances;
+    out.values = values;
+    out.reduced_mapping = keep;
+
+    return out;
+}
+
+size_t solve_helper(const TunnelData &data, int cur, std::vector<bool> &seen, int time, size_t size)
+{
+    size_t best = 0;
+    if (time > T)
+        return 0;
+
+    for (int i = 0; i < size; ++i)
+    {
+        if (seen[i])
+            continue;
+
+        seen[i] = true;
+        size_t dist = data.distances[cur][i];
+
+        if (time + dist > T)
+        {
+            seen[i] = false;
+            continue;
+        }
+
+        best = std::max(best, data.values[i] * (T - time - dist) + solve_helper(data, i, seen, time + dist + 1, size));
+        seen[i] = false;
+    }
+
+    return best;
+}
+
+int solve(const TunnelData &data, const TunnelData &reduced)
+{
+    size_t size = reduced.values.size();
+    std::vector<bool> seen = std::vector<bool>(size, false);
+
+    // because start might not be in the matrix
+    // do the first step outside of the solve_helper
+    size_t best = 0;
+    for (int i = 0; i < size; ++i)
+    {
+        auto start = reduced.reduced_mapping[i];
+        best = std::max(best, solve_helper(reduced, i, seen, 1 + data.distances[data.start][start], size));
+    }
+
+    return best;
 }
 
 TunnelData read_file(std::string filename)
@@ -108,7 +172,9 @@ TunnelData read_file(std::string filename)
 void part_one()
 {
     auto data = read_file("day16.in");
-    auto sol = solve(data);
+    allPairsShortestPaths(data);
+    auto reduced = reduceGraph(data);
+    auto sol = solve(data, reduced);
     std::cout << "part one solution: " << sol << std::endl;
 }
 
