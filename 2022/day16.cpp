@@ -7,7 +7,7 @@
 #include <vector>
 
 // NOTE: need to change this for differnet inputs
-const int N = 10;
+const int N = 62;
 
 struct Graph
 {
@@ -15,6 +15,7 @@ struct Graph
     std::vector<std::vector<int>> distances;
     std::vector<int> values;
     std::vector<int> node_map;
+    int start;
 };
 
 Graph read_file(std::string filename)
@@ -59,6 +60,7 @@ Graph read_file(std::string filename)
         }
     }
 
+    g.start = nodes["AA"];
     return g;
 };
 
@@ -110,71 +112,39 @@ Graph reduceGraph(const Graph &data)
 
 int solve_helper(const Graph &graph, int cur1, int time1, int cur2, int time2, std::vector<bool> &seen, int max_time)
 {
-    // two actors are independent iff the time difference is less than the min of travel time
-    // in this case, we can move them both simultaneously
-    // otherwise we act one at a time
 
     int best = 0;
     int size = graph.node_map.size();
 
-    std::vector<int> dependent_actions;
-    std::vector<int> independent_actions;
-
-    // partition action space into those that are less than time difference
-    int actor = (time1 < time2) ? cur1 : cur2;
-    int other = (actor == cur1) ? cur2 : cur1;
-    int actor_time = std::min(time1, time2);
-    int other_time = std::max(time1, time2);
-    int time_diff = other_time - actor_time;
-    for (int i = 0; i < size; ++i)
+    // have cur2 do nothing
+    for (int n1 = 0; n1 < size; ++n1)
     {
-        if (seen[i])
-            continue;
-
-        if (graph.distances[actor][i] < time_diff)
-            dependent_actions.push_back(i);
-        else
-            independent_actions.push_back(i);
-    }
-
-    // do actions for behind actor
-    for (int next : dependent_actions)
-    {
-        int dist = graph.distances[actor][next];
-        if (dist >= (max_time - actor_time) || seen[next])
-            continue;
-
-        seen[next] = true;
-        int score = solve_helper(graph, next, actor_time + dist + 1, other, other_time, seen, max_time);
-        score += graph.values[next] * (max_time - actor_time - dist);
-        best = std::max(score, best);
-        seen[next] = false;
-    }
-
-    // do actions for both actors
-    for (int next1 : independent_actions)
-    {
-        int dist1 = graph.distances[actor][next1];
-        if (dist1 >= (max_time - actor_time) || seen[next1])
-            continue;
-
-        for (int next2 = 0; next2 < size; ++next2)
+        int d1 = graph.distances[cur1][n1];
+        if (time1 + d1 <= max_time && !seen[n1])
         {
-            int dist2 = graph.distances[other][next2];
-            if (dist2 >= (max_time - other_time) || seen[next2] || next1 == next2)
-                continue;
+            int score = 0;
+            score += graph.values[n1] * (max_time - d1 - time1);
 
-            seen[next1] = true;
-            seen[next2] = true;
-
-            int score =
-                solve_helper(graph, next1, actor_time + dist1 + 1, next2, other_time + dist2 + 1, seen, max_time);
-            score += graph.values[next1] * (max_time - actor_time - dist1);
-            score += graph.values[next2] * (max_time - other_time - dist2);
+            seen[n1] = true;
+            score += solve_helper(graph, n1, time1 + d1 + 1, cur2, time2, seen, max_time);
             best = std::max(score, best);
+            seen[n1] = false;
+        }
+    }
 
-            seen[next1] = false;
-            seen[next2] = false;
+    // have cur1 do nothing
+    for (int n2 = 0; n2 < size; ++n2)
+    {
+        int d2 = graph.distances[cur2][n2];
+        if (time2 + d2 <= max_time && !seen[n2])
+        {
+            int score = 0;
+            score += graph.values[n2] * (max_time - d2 - time2);
+
+            seen[n2] = true;
+            score += solve_helper(graph, cur1, time1, n2, time2 + d2 + 1, seen, max_time);
+            best = std::max(score, best);
+            seen[n2] = false;
         }
     }
 
@@ -194,8 +164,7 @@ void part_one()
     for (int start = 0; start < size; ++start)
     {
         std::vector<bool> seen(size);
-        auto orig = graph.node_map[start];
-        auto dist = data.distances[orig][start];
+        auto dist = data.distances[data.start][graph.node_map[start]];
         int score = solve_helper(graph, start, 1 + dist, 0, T + 1, seen, T);
 
         best = std::max(score, best);
@@ -219,10 +188,8 @@ void part_two()
         for (int start2 = 0; start2 < size; ++start2)
         {
             std::vector<bool> seen(size);
-            auto orig1 = graph.node_map[start1];
-            auto dist1 = data.distances[orig1][start1];
-            auto orig2 = graph.node_map[start2];
-            auto dist2 = data.distances[orig2][start2];
+            auto dist1 = data.distances[data.start][graph.node_map[start1]];
+            auto dist2 = data.distances[data.start][graph.node_map[start2]];
             int score = solve_helper(graph, start1, 1 + dist1, start2, 1 + dist2, seen, T);
 
             best = std::max(score, best);
