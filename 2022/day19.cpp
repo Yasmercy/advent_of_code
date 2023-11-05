@@ -43,7 +43,7 @@ struct Robot
     {
         int out = std::numeric_limits<int>::min();
         for (int i = 0; i < N; ++i)
-            out = std::max(out, ceil_divide(cost[i] - bag[i], robots[i]));
+            out = std::max(out, ceil_divide(std::max(0, cost[i] - bag[i]), robots[i]));
         return out;
     }
 
@@ -63,11 +63,12 @@ std::vector<Blueprint> read_file(std::string filename)
 
     int ore = 0, clay = 0, obsidian = 0, geode = 0;
     std::string line;
-    while (std::getline(ifs, line))
+    int index = 0;
+    while (++index, std::getline(ifs, line))
     {
         std::stringstream ss(line);
 
-        ss.ignore(33);
+        ss.ignore(33 + (index >= 10));
         ss >> ore;
         Robot ore_robot{0, {ore, clay, obsidian, geode}};
         ore = 0;
@@ -97,7 +98,16 @@ std::vector<Blueprint> read_file(std::string filename)
     return out;
 }
 
-int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robots, int time)
+bool has_potential(const std::vector<int> &bag, const std::vector<int> &robots, int time, int best)
+{
+    // whether the best possible score can beat the current global_best
+    // this is whether at every time step building a robot, we can surpass the best
+    // with t left, we can make (t-1) + (t-2) + .. + 1 = t * (t-1) / 2
+    // (this doesnt always work because of integer divison)
+    return (time * time / 2 + robots[N - 1] * time) > (best - bag[N - 1]);
+}
+
+int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robots, int time, int *global_best)
 {
     // make a choice to build one more of any robot (and take the max)
     // returns the # of geodes it created (starting at time)
@@ -110,16 +120,23 @@ int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robo
     int best = bag[N - 1];
     for (int i = 0; i < N; ++i)
     {
+        if (!has_potential(bag, robots, time, *global_best))
+            continue;
+
         int t = bp.robots[i].time_to_build(bag, robots);
         if (t >= time)
             continue;
+
+        // spend 1 time actually building the robot
+        ++t;
 
         // do action
         for (int i = 0; i < N; ++i)
             bp.robots[i].collect(bag, t, robots[i]);
         bp.robots[i].build(bag, robots);
 
-        best = std::max(best, max_score(bp, bag, robots, time - t));
+        best = std::max(best, max_score(bp, bag, robots, time - t, global_best));
+        *global_best = std::max(best, *global_best);
 
         // undo action
         bp.robots[i].unbuild(bag, robots);
@@ -138,11 +155,33 @@ void part_one()
 
     int solution = 0;
     for (int i = 0; i < blueprints.size(); ++i)
-        solution += (i + 1) * max_score(blueprints[i], bag, robots, 24);
+    {
+        int global_best = 0;
+        auto score = max_score(blueprints[i], bag, robots, 24, &global_best);
+        solution += (i + 1) * score;
+    }
+    std::cout << solution << "\n";
+}
+
+void part_two()
+{
+    const auto blueprints_all = read_file("day19.in");
+    const std::vector<Blueprint> blueprints(blueprints_all.begin(), blueprints_all.begin() + 3);
+    std::vector<int> robots = {1, 0, 0, 0};
+    std::vector<int> bag(N);
+
+    int solution = 1;
+    for (int i = 0; i < blueprints.size(); ++i)
+    {
+        int global_best = 0;
+        auto score = max_score(blueprints[i], bag, robots, 32, &global_best);
+        solution *= score;
+    }
     std::cout << solution << "\n";
 }
 
 int main()
 {
-    part_one();
+    // part_one();
+    part_two();
 }
