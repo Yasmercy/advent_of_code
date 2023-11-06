@@ -4,12 +4,12 @@
 #include <iterator>
 #include <vector>
 
-std::pair<std::vector<int>, int> read_file(std::string filename)
+std::pair<std::vector<long>, long> read_file(std::string filename)
 {
-    std::vector<int> out;
+    std::vector<long> out;
     std::ifstream ifs(filename);
-    int x;
-    int zero;
+    long x;
+    long zero;
 
     while (ifs.good())
     {
@@ -25,52 +25,58 @@ std::pair<std::vector<int>, int> read_file(std::string filename)
     return {out, zero};
 }
 
-void update_indices(std::vector<int> &indices, int pos, int diff, int n)
+long modulus_add(long x, long y, long m)
+{
+    return (((x + y) % m) + m) % m;
+}
+
+void update_indices(std::vector<long> &indices, long pos, long diff, long n)
 {
     // indices = mapping from mixing order -> mixed
     // pos = place in indices we're at
     // diff = how much to move indices[pos] by
     // n = size of the array
 
+    diff = modulus_add(diff, 0, n - 1);
     if (diff == 0)
         return;
 
     // establish the bounds (indices) that are affected:
-    int other = (n + ((indices[pos] + diff) % n)) % n;
-    int lo = (indices[pos] < other) ? indices[pos] : other;
-    int hi = (indices[pos] >= other) ? indices[pos] : other;
+    long other = modulus_add(indices[pos], diff, n);
+    long lo = (indices[pos] < other) ? indices[pos] : other;
+    long hi = (indices[pos] >= other) ? indices[pos] : other;
 
     // other useful variables
-    int change = (diff < 0) ? 1 : -1;
-    int tmp = indices[pos];
-    bool wrapped = (diff > 0 && other == lo) || (diff < 0 && other == hi);
+    long change = (diff < 0) ? 1 : -1;
+    long tmp = indices[pos];
+    bool wrapped = other == lo;
 
     // get the affected indices (in the range ^ wrapped)
-    for (int i = 0; i < n; ++i)
+    for (long i = 0; i < n; ++i)
         if (((lo < indices[i] && indices[i] < hi) ^ wrapped) || indices[i] == lo || indices[i] == hi)
-            indices[i] = (n + ((indices[i] + change) % n)) % n;
+            indices[i] = modulus_add(indices[i], change, n);
 
     // pos is special
-    indices[pos] = (n + ((tmp + diff) % n)) % n;
+    indices[pos] = modulus_add(tmp, diff, n);
 }
 
-void print_indices(const std::vector<int> &indices, const std::vector<int> &data, int n)
+void prlong_indices(const std::vector<long> &indices, const std::vector<long> &data, long n)
 {
-    std::vector<int> real(n);
-    for (int i = 0; i < n; ++i)
+    std::vector<long> real(n);
+    for (long i = 0; i < n; ++i)
         real[indices[i]] = data[i];
 
     std::cout << '[';
-    for (int i = 0; i < n; ++i)
+    for (long i = 0; i < n; ++i)
         std::cout << real[i] << ", ";
     std::cout << "]\n";
 }
 
-int sum_indices(const std::vector<int> &indices, const std::vector<int> &data, const std::vector<int> &goal)
+long sum_indices(const std::vector<long> &indices, const std::vector<long> &data, const std::vector<long> &goal)
 {
-    int out = 0;
+    long out = 0;
 
-    for (int i = 0; i < indices.size(); ++i)
+    for (long i = 0; i < indices.size(); ++i)
         if (std::find(goal.begin(), goal.end(), indices[i]) != goal.end())
             out += data[i];
 
@@ -80,19 +86,43 @@ int sum_indices(const std::vector<int> &indices, const std::vector<int> &data, c
 void part_one()
 {
     auto [data, zero] = read_file("day20.in");
-    int n = data.size();
+    long n = data.size();
 
-    std::vector<int> indices;
-    for (int i = 0; i < n; ++i)
+    std::vector<long> indices;
+    for (long i = 0; i < n; ++i)
         indices.push_back(i);
-    for (int i = 0; i < n; ++i)
+
+    for (long i = 0; i < n; ++i)
         update_indices(indices, i, data[i], n);
 
-    std::vector<int> goal_indices = {(zero + 1000) % n, (zero + 2000) % n, (zero + 3000) % n};
+    zero = indices[zero];
+    std::vector<long> goal_indices = {(zero + 1000) % n, (zero + 2000) % n, (zero + 3000) % n};
+    std::cout << sum_indices(indices, data, goal_indices) << '\n';
+}
+
+void part_two()
+{
+    auto [data, zero] = read_file("day20.in");
+    long n = data.size();
+
+    for (long i = 0; i < n; ++i)
+        data[i] *= 811589153;
+
+    std::vector<long> indices;
+    for (long i = 0; i < n; ++i)
+        indices.push_back(i);
+
+    for (int j = 0; j < 10; ++j)
+        for (long i = 0; i < n; ++i)
+            update_indices(indices, i, data[i], n);
+
+    zero = indices[zero];
+    std::vector<long> goal_indices = {(zero + 1000) % n, (zero + 2000) % n, (zero + 3000) % n};
     std::cout << sum_indices(indices, data, goal_indices) << '\n';
 }
 
 int main()
 {
     part_one();
+    part_two();
 }
