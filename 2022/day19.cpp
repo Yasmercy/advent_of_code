@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -54,6 +55,11 @@ struct Robot
 struct Blueprint
 {
     std::vector<Robot> robots;
+    std::vector<int> geode_requirements() const
+    {
+        // returns the requirements to construct 1 geode making machine
+        return {1, 1, 1}; // TODO
+    }
 };
 
 std::vector<Blueprint> read_file(std::string filename)
@@ -107,6 +113,22 @@ bool has_potential(const std::vector<int> &bag, const std::vector<int> &robots, 
     return (time * time / 2 + robots[N - 1] * time) > (best - bag[N - 1]);
 }
 
+std::vector<int> get_order(const Blueprint &bp, const std::vector<int> &robots)
+{
+    std::vector<int> out;
+    out.push_back(3); // geodes always highest priority
+
+    // order is difference from ideal
+    // sort by robots[i] / resource_requirements[i] (ascending)
+
+    // TODO
+    out.push_back(2);
+    out.push_back(1);
+    out.push_back(0);
+
+    return out;
+}
+
 int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robots, int time, int *global_best)
 {
     // make a choice to build one more of any robot (and take the max)
@@ -118,7 +140,7 @@ int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robo
     // recursive call
 
     int best = bag[N - 1];
-    for (int i = 0; i < N; ++i)
+    for (int i : get_order(bp, robots))
     {
         if (!has_potential(bag, robots, time, *global_best))
             continue;
@@ -182,6 +204,6 @@ void part_two()
 
 int main()
 {
-    // part_one();
-    part_two();
+    part_one();
+    // part_two();
 }
