@@ -107,8 +107,8 @@ std::unordered_map<std::string, uint64_t> get_values(const std::unordered_map<st
 
     for (const auto &[key, _] : jobs)
     {
-        int x = get_call(jobs, key);
-        int y = get_call(modify, key);
+        uint64_t x = get_call(jobs, key);
+        uint64_t y = get_call(modify, key);
         out.insert({key, x * (x == y)});
     }
 
