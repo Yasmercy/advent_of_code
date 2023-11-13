@@ -12,15 +12,19 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <numeric>
+#include <queue>
 #include <set>
 #include <string>
 #include <vector>
-#include <numeric>
 
 struct BlizzardMap
 {
     bool blizzard(int node, int time)
     {
+        if (node == -1)
+            return false;
+
         int row = node / width;
         int col = node % width;
 
@@ -37,6 +41,9 @@ struct BlizzardMap
 
     std::vector<int> neighbors(int i)
     {
+        if (i == -1)
+            return {-1, 0};
+
         std::vector<int> out;
         int row = i / width;
         int col = i % width;
@@ -97,51 +104,38 @@ BlizzardMap read_file(std::string filename)
     return out;
 }
 
-std::vector<std::vector<bool>> make_blank(BlizzardMap blizzards, int size, int lcm)
+struct Position
 {
-    std::vector<std::vector<bool>> tmp(size - 1, std::vector<bool>(lcm, false));
-    std::vector<bool> last;
-    for (int t = 0; t < lcm; ++t)
-        last.push_back(!blizzards.blizzard(size - 1, t));
-    tmp.push_back(last);
-    return tmp;
-}
+    int pos;
+    int time;
 
+    auto operator<=>(const Position &) const = default;
+};
+
+// replace this with A*
 int solve(BlizzardMap blizzards)
 {
-    const int size = blizzards.width * blizzards.height;
-    const int lcm = std::lcm(blizzards.width, blizzards.height);
-    std::vector<std::vector<std::vector<bool>>> dp{make_blank(blizzards, size, lcm)};
+    std::queue<Position> queue;
+    std::set<Position> seen;
+    queue.push({-1, 0});
+    int end = blizzards.width * blizzards.height - 1;
+    int lcm = std::lcm(blizzards.width, blizzards.height);
 
-    // int done = std::numeric_limits<int>::max();
-    bool done = false;
-    while (dp.size() && !done)
+    while (!queue.empty())
     {
-        std::cout << dp.size() << '\n';
-        for (auto b : dp.back()[0])
-            done = done || b;
-            // if (b)
-            //     // done = std::min(done, static_cast<int>(dp.size() + size));
+        Position next = queue.front();
+        seen.insert(next);
+        queue.pop();
 
-        auto add = dp.back();
-        for (int i = 0; i < size; ++i)
-            for (int t = 0; t < lcm; ++t)
-                for (int j : blizzards.neighbors(i))
-                {
-                    int next_time = (t + lcm + 1) % lcm;
-                    add[i][t] = add[i][t] || (!blizzards.blizzard(j, next_time) && dp.back()[j][next_time]);
-                    // add[i][t] = add[i][t] || dp.back()[j][next_time];
-                }
-        dp.push_back(add);
-    }
+        if (next.pos == end)
+            return next.time + 1;
 
-    int best = std::numeric_limits<int>::max();
-    for (int i = 0; i < dp.size(); ++i)
-        for (int b = 0; b < lcm; ++b)
-            if (dp[i][0][b])
-                best = std::min(best, i + ((b + lcm - 1) % lcm));
-    return best + 2; // + 1 for each start and end
-};
+        for (int j : blizzards.neighbors(next.pos))
+            if (!blizzards.blizzard(j, (next.time + 1) % lcm) && !seen.contains({j, next.time + 1}))
+                queue.push({j, next.time + 1});
+    };
+    throw std::runtime_error("failed");
+}
 
 void part_one()
 {
