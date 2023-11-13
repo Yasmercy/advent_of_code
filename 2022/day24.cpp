@@ -24,6 +24,8 @@ struct BlizzardMap
     {
         if (node == -1)
             return false;
+        if (node == width * height)
+            return false;
 
         int row = node / width;
         int col = node % width;
@@ -42,7 +44,9 @@ struct BlizzardMap
     std::vector<int> neighbors(int i)
     {
         if (i == -1)
-            return {-1, 0};
+            return {i, i + 1};
+        if (i == width * height)
+            return {i, i - 1};
 
         std::vector<int> out;
         int row = i / width;
@@ -112,39 +116,112 @@ struct Position
     auto operator<=>(const Position &) const = default;
 };
 
-// replace this with A*
-int solve(BlizzardMap blizzards)
+int h(const Position &pos, const BlizzardMap &blizzards)
 {
-    std::queue<Position> queue;
+    // return manhattan distance to end
+    int row = pos.pos / blizzards.width;
+    int col = pos.pos % blizzards.width;
+    int dist = blizzards.height - row + blizzards.width - col;
+    return dist;
+}
+
+int f(const Position &pos, const BlizzardMap &blizzards)
+{
+    return pos.time + h(pos, blizzards);
+};
+
+void heap_push(std::vector<Position> &heap, const BlizzardMap &blizzards, const Position &pos)
+{
+    heap.push_back(pos);
+
+    // heapify up
+    int i = heap.size() - 1;
+    int parent = (i - 1) / 2;
+    while (i > 0 && f(heap[i], blizzards) < f(heap[parent], blizzards))
+    {
+        std::swap(heap[i], heap[parent]);
+        i = parent;
+        parent = (i - 1) / 2;
+    }
+}
+
+Position heap_pop(std::vector<Position> &heap, const BlizzardMap &blizzards)
+{
+    Position out = heap[0];
+    heap[0] = heap.back();
+    heap.pop_back();
+
+    // heapify down
+    int start = 0;
+    while (true)
+    {
+        int left = 2 * start + 1;
+        int right = 2 * start + 2;
+        int min = start;
+
+        if (left < heap.size() && f(heap[min], blizzards) > f(heap[left], blizzards))
+            min = left;
+        if (right < heap.size() && f(heap[min], blizzards) > f(heap[right], blizzards))
+            min = right;
+
+        if (min == start)
+            break;
+
+        std::swap(heap[start], heap[min]);
+        start = min;
+    };
+
+    return out;
+}
+
+int solve(BlizzardMap blizzards, int start, int start_time, int end)
+{
+    std::vector<Position> heap{{start, start_time}};
     std::set<Position> seen;
-    queue.push({-1, 0});
-    int end = blizzards.width * blizzards.height - 1;
+
     int lcm = std::lcm(blizzards.width, blizzards.height);
 
-    while (!queue.empty())
+    while (!heap.empty())
     {
-        Position next = queue.front();
+        Position next = heap_pop(heap, blizzards);
+        if (seen.contains(next))
+            continue;
         seen.insert(next);
-        queue.pop();
 
         if (next.pos == end)
-            return next.time + 1;
+            return next.time;
 
         for (int j : blizzards.neighbors(next.pos))
             if (!blizzards.blizzard(j, (next.time + 1) % lcm) && !seen.contains({j, next.time + 1}))
-                queue.push({j, next.time + 1});
+                heap_push(heap, blizzards, {j, next.time + 1});
     };
+
     throw std::runtime_error("failed");
 }
 
 void part_one()
 {
     BlizzardMap blizzards = read_file("day24.in");
-    int solution = solve(blizzards);
+    int solution = solve(blizzards, -1, 0, blizzards.width * blizzards.height - 1) + 1;
     std::cout << solution << '\n';
 };
+
+void part_two()
+{
+    BlizzardMap blizzards = read_file("day24.in");
+    int begin = -1;
+    int end = blizzards.width * blizzards.height;
+    int time = 0;
+
+    time = solve(blizzards, begin, time, end - 1) + 1;
+    time = solve(blizzards, end, time, begin + 1) + 1;
+    time = solve(blizzards, begin, time, end - 1) + 1;
+
+    std::cout << time << '\n';
+}
 
 int main()
 {
     part_one();
+    part_two();
 }
