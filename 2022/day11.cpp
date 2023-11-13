@@ -1,194 +1,182 @@
-#include <iostream>
 #include <fstream>
-#include <string>
+#include <iostream>
+#include <limits>
+#include <numeric>
 #include <sstream>
 #include <vector>
-#include <map>
-#include <utility>
-#include <functional>
-#include <cmath>
-#include <cinttypes>
 
+constexpr uint64_t MAX = std::numeric_limits<uint64_t>::max();
 
-struct Monkey {
-    Monkey(std::vector<std::string> inputs) {
+struct Monkey
+{
+    Monkey(std::vector<std::string> inputs)
+    {
         get_starting(inputs[0]);
         get_operation(inputs[1]);
-        get_test(inputs[2], inputs[3], inputs[4]);
+        modulus = get_last_number(inputs[2]);
+        true_to = get_last_number(inputs[3]);
+        false_to = get_last_number(inputs[4]);
     }
 
-    void get_starting(std::string starting) {
-        std::stringstream ss(starting.substr(18));
+    void get_starting(std::string starting)
+    {
+        std::istringstream ss(starting);
+        std::string line;
+        std::getline(ss, line, ':');
 
-        uint64_t x;
-        while (!ss.eof()) {
-            ss >> x;
-            items.push_back(x);
-            ss.ignore(2);
-        }
+        while (std::getline(ss, line, ','))
+            items.push_back(std::stoi(line));
     }
 
-    void get_operation(std::string operation) {
-        std::stringstream ss(operation.substr(23));
+    void get_operation(std::string operation)
+    {
+        std::istringstream ss(operation);
+        std::string line;
+        std::getline(ss, line, '=');
 
-        // get the operation type
-        // *, +
-        char c;
-        uint64_t x = 0;
-        ss >> c;
-        if (c == '*') {
-            // get the operand: number or "old"
-            ss >> x;
-            if (x == 0) {
-                // old
-                this->operation = [x](uint64_t a) {return a * a;};
-            } else {
-                // number
-                this->operation = [x](uint64_t a) {return a * x;};
-            }
-        } else { // c == '+'
-            // get the operand: number or "old"
-            ss >> x;
-            if (x == 0) {
-                // old
-                this->operation = [x](uint64_t a) {return a + a;};
-            } else {
-                // number
-                this->operation = [x](uint64_t a) {return a + x;};
-            }
-        }
-    }
-
-    void get_test(std::string test_str, std::string t, std::string f) {
-        std::stringstream ss;
-        
-        // get the test number (divisble by)
-        ss << test_str;
-        ss.ignore(21);
-        uint64_t x;
+        std::string x;
         ss >> x;
-        
-        // get the test number (true)
-        ss = std::stringstream();
-        ss << t.substr(29);
-        uint64_t y;
-        ss >> y;
-        
-        // get the test number (false)
-        ss = std::stringstream();
-        ss << f.substr(30);
-        uint64_t z;
-        ss >> z;
+        args.push_back((x == "old") ? MAX : std::stoi(x));
+        ss >> op;
+        ss >> x;
+        args.push_back((x == "old") ? MAX : std::stoi(x));
+    }
 
-        // create function
-        test = [x, y, z](uint64_t a) { 
-            return (a % x == 0) ? y : z; 
-        };
+    uint64_t get_last_number(std::string line)
+    {
+        std::vector<std::string> data;
+        std::istringstream ss(line);
+
+        while (std::getline(ss, line, ' '))
+            data.push_back(line);
+        return std::stoi(data.back());
+    }
+
+    uint64_t inspect_item()
+    {
+        ++inspected;
+        uint64_t item = items.back();
+
+        std::vector<uint64_t> x;
+        x.push_back((args[0] == MAX) ? item : args[0]);
+        x.push_back((args[1] == MAX) ? item : args[1]);
+
+        switch (op)
+        {
+        case '*':
+            return x[0] * x[1];
+        case '/':
+            return x[0] / x[1];
+        case '-':
+            return x[0] - x[1];
+        case '+':
+            return x[0] + x[1];
+        }
+
+        throw std::runtime_error("failed");
     }
 
     std::vector<uint64_t> items;
-    std::function<uint64_t(uint64_t)> operation;
-    std::function<uint64_t(uint64_t)> test;
-    uint64_t inspected = 0;
+    std::vector<uint64_t> args;
+    char op;
+    uint64_t modulus;
+    uint64_t true_to;
+    uint64_t false_to;
 
-    void process(std::vector<Monkey>& states, bool flag) {
-        for (uint64_t item : items) {
-            item = operation(item);
-            if (flag) {
-                item = item / 3;
-            }
-            uint64_t next = test(item);
-            states[next].items.push_back(item);
-        }
-        inspected += items.size();
-        items.clear();
-    }
+    uint64_t inspected = 0;
 };
 
-struct Troop {
-    std::vector<Monkey> states;
-    void step(uint64_t n, bool flag) {
-        if (n == 0) {
-            return;
-        }
-        for (Monkey& s : states) {
-            s.process(states, flag);
-        }
+struct Troop
+{
+    std::vector<Monkey> monkeys;
 
-        step(--n, flag);
+    void process_monkey(Monkey &monkey, bool relief, uint64_t modulus)
+    {
+        while (!monkey.items.empty())
+        {
+            auto item = monkey.inspect_item();
+            monkey.items.pop_back();
+
+            if (relief)
+                item = item / 3;
+            item = item % modulus;
+            int next = (item % monkey.modulus == 0) ? monkey.true_to : monkey.false_to;
+            monkeys[next].items.push_back(item);
+        }
     }
 
-    uint64_t monkey_business() {
-        // find the top two inspected counts
+    void do_round(bool relief, uint64_t modulus)
+    {
+        for (auto &monkey : monkeys)
+            process_monkey(monkey, relief, modulus);
+    }
+
+    uint64_t multiply_inspected()
+    {
         uint64_t max = 0;
-        for (uint64_t i = 0; i < states.size(); ++i) {
-            for (uint64_t j = 0; j < states.size(); ++j) {
-                if (j == i) {
-                    continue;
-                }
-                max = std::max(max, states[i].inspected * states[j].inspected);
-            }
-        }
+        for (uint64_t i = 0; i < monkeys.size(); ++i)
+            for (uint64_t j = 0; j < monkeys.size(); ++j)
+                max = std::max(max, (j != i) * monkeys[i].inspected * monkeys[j].inspected);
         return max;
     }
+
+    uint64_t lcm_modulus()
+    {
+        uint64_t lcm = 1;
+        for (const auto &monkey : monkeys)
+            lcm = std::lcm(lcm, monkey.modulus);
+        return lcm;
+    }
 };
 
-Troop process_file(std::string filename) {
+Troop read_file(std::string filename)
+{
     Troop troop;
 
     std::ifstream ifs(filename);
     std::string dummy;
 
-    while (ifs.good()) {
-        std::string starting;
-        std::string operation;
-        std::string test;
-        std::string t;
-        std::string f;
+    while (ifs.good())
+    {
+        std::vector<std::string> data;
 
         std::getline(ifs, dummy); // dummy call
-        std::getline(ifs, starting);
-        std::getline(ifs, operation);
-        std::getline(ifs, test);
-        std::getline(ifs, t);
-        std::getline(ifs, f);
-        std::getline(ifs, dummy); // dummy call
-
-        troop.states.push_back(Monkey({
-            starting,
-            operation,
-            test,
-            t,
-            f
-        }));
-        
-        if (ifs.eof()) {
-            break;
+        for (int i = 0; i < 5; ++i)
+        {
+            std::getline(ifs, dummy);
+            data.push_back(dummy);
         }
+        std::getline(ifs, dummy); // dummy call
 
+        troop.monkeys.push_back(Monkey(data));
+
+        if (ifs.eof())
+            break;
     }
 
     return troop;
 };
 
-void part_one() {
-    Troop t = process_file("day11.in");
-    t.step(20, true);
-    std::cout << t.monkey_business() << "\n";
+void part_one()
+{
+    Troop troop = read_file("day11.in");
+    uint64_t modulus = troop.lcm_modulus();
+    for (int i = 0; i < 20; ++i)
+        troop.do_round(true, modulus);
+    std::cout << troop.multiply_inspected() << '\n';
 }
 
-void part_two() {
-    Troop t = process_file("day11.in");
-    t.step(20, false);
-
-    for (auto m : t.states) {
-        std::cout << m.inspected << "\n";
-    }
-
-    std::cout << t.monkey_business() << "\n";
+void part_two()
+{
+    Troop troop = read_file("day11.in");
+    uint64_t modulus = troop.lcm_modulus();
+    for (int i = 0; i < 10'000; ++i)
+        troop.do_round(false, modulus);
+    std::cout << troop.multiply_inspected() << '\n';
 }
 
-int main() {
+int main()
+{
     part_one();
     part_two();
 }
