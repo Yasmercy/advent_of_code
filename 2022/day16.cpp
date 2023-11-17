@@ -1,7 +1,10 @@
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -53,9 +56,7 @@ Graph read_file(std::string filename)
         {
             ss.ignore(1);
             if (auto search = nodes.find(name); search == nodes.end())
-            {
                 nodes[name] = nodes.size();
-            }
             g.adjList[nodes[name]].push_back(start);
         }
     }
@@ -110,24 +111,59 @@ Graph reduceGraph(const Graph &data)
     return out;
 }
 
-int solve_helper(const Graph &graph, int cur1, int time1, int cur2, int time2, std::vector<bool> &seen, int max_time)
+int ideal_score(const Graph &graph, int t1, int t2, std::vector<bool> &seen, int max_time)
 {
+    std::vector<int> values;
+    for (int i = 0; i < seen.size(); ++i)
+        if (!seen[i])
+            values.push_back(graph.values[i]);
 
-    int best = 0;
+    // assumes all are 1 distance away
+    int score = 0;
+    std::sort(values.begin(), values.end());
+    for (int i = values.size() - 1; i >= 0; --i)
+        if (t1 < t2)
+            score += (max_time - --t1 - 2) * values[i];
+        else
+            score += (max_time - --t2 - 2) * values[i];
+    return score;
+}
+
+int hash_position(int cur1, int cur2, int time1, int time2)
+{
+    if (cur2 > cur1)
+    {
+        std::swap(cur1, cur2);
+        std::swap(time1, time2);
+    }
+
+    return cur1 * std::pow(50, 3) + cur2 * std::pow(50, 2) + time1 * 50 + time2;
+}
+
+void solve_helper(const Graph &graph, int cur1, int time1, int cur2, int time2, std::vector<bool> &seen, int max_time,
+                  int cur_score, int *best, std::map<int, int> &visited)
+{
+    if (cur_score + ideal_score(graph, time1, time2, seen, max_time) < *best)
+        return;
+
+    if (auto search = visited.find(hash_position(cur1, cur2, time1, time2));
+        search != visited.end() && search->second >= cur_score)
+        return;
+
+    visited.insert({hash_position(cur1, cur2, time1, time2), cur_score});
+
     int size = graph.node_map.size();
-
     // have cur2 do nothing
     for (int n1 = 0; n1 < size; ++n1)
     {
         int d1 = graph.distances[cur1][n1];
         if (time1 + d1 <= max_time && !seen[n1])
         {
-            int score = 0;
-            score += graph.values[n1] * (max_time - d1 - time1);
+            int score = cur_score + graph.values[n1] * (max_time - d1 - time1);
+            *best = std::max(score, *best);
 
             seen[n1] = true;
-            score += solve_helper(graph, n1, time1 + d1 + 1, cur2, time2, seen, max_time);
-            best = std::max(score, best);
+            solve_helper(graph, n1, time1 + d1 + 1, cur2, time2, seen, max_time, score, best, visited);
             seen[n1] = false;
         }
     }
@@ -138,17 +174,14 @@ int solve_helper(const Graph &graph, int cur1, int time1, int cur2, int time2, s
         int d2 = graph.distances[cur2][n2];
         if (time2 + d2 <= max_time && !seen[n2])
         {
-            int score = 0;
-            score += graph.values[n2] * (max_time - d2 - time2);
+            int score = cur_score + graph.values[n2] * (max_time - d2 - time2);
+            *best = std::max(score, *best);
 
             seen[n2] = true;
-            score += solve_helper(graph, cur1, time1, n2, time2 + d2 + 1, seen, max_time);
-            best = std::max(score, best);
+            solve_helper(graph, cur1, time1, n2, time2 + d2 + 1, seen, max_time, score, best, visited);
             seen[n2] = false;
         }
     }
-
-    return best;
 }
 
 void part_one()
@@ -160,14 +193,13 @@ void part_one()
     int size = graph.node_map.size();
     int T = 30;
     int best = 0;
+    std::map<int, int> visited;
 
     for (int start = 0; start < size; ++start)
     {
         std::vector<bool> seen(size);
         auto dist = data.distances[data.start][graph.node_map[start]];
-        int score = solve_helper(graph, start, 1 + dist, 0, T + 1, seen, T);
-
-        best = std::max(score, best);
+        solve_helper(graph, start, 1 + dist, 0, T + 1, seen, T, 0, &best, visited);
     }
 
     std::cout << "part one sol: " << best << "\n";
@@ -182,17 +214,17 @@ void part_two()
     int size = graph.node_map.size();
     int T = 26;
     int best = 0;
+    std::map<int, int> visited;
 
+    // lower bound with greedy method
     for (int start1 = 0; start1 < size; ++start1)
     {
-        for (int start2 = 0; start2 < size; ++start2)
+        for (int start2 = start1; start2 < size; ++start2)
         {
             std::vector<bool> seen(size);
             auto dist1 = data.distances[data.start][graph.node_map[start1]];
             auto dist2 = data.distances[data.start][graph.node_map[start2]];
-            int score = solve_helper(graph, start1, 1 + dist1, start2, 1 + dist2, seen, T);
-
-            best = std::max(score, best);
+            solve_helper(graph, start1, 1 + dist1, start2, 1 + dist2, seen, T, 0, &best, visited);
         }
     }
 
