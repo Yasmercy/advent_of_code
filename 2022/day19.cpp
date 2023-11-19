@@ -55,11 +55,6 @@ struct Robot
 struct Blueprint
 {
     std::vector<Robot> robots;
-    std::vector<int> geode_requirements() const
-    {
-        // returns the requirements to construct 1 geode making machine
-        return {1, 1, 1}; // TODO
-    }
 };
 
 std::vector<Blueprint> read_file(std::string filename)
@@ -109,24 +104,8 @@ bool has_potential(const std::vector<int> &bag, const std::vector<int> &robots, 
     // whether the best possible score can beat the current global_best
     // this is whether at every time step building a robot, we can surpass the best
     // with t left, we can make (t-1) + (t-2) + .. + 1 = t * (t-1) / 2
-    // (this doesnt always work because of integer divison)
+    // because of integer divison we are using t^2 / 2
     return (time * time / 2 + robots[N - 1] * time) > (best - bag[N - 1]);
-}
-
-std::vector<int> get_order(const Blueprint &bp, const std::vector<int> &robots)
-{
-    std::vector<int> out;
-    out.push_back(3); // geodes always highest priority
-
-    // order is difference from ideal
-    // sort by robots[i] / resource_requirements[i] (ascending)
-
-    // TODO
-    out.push_back(2);
-    out.push_back(1);
-    out.push_back(0);
-
-    return out;
 }
 
 int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robots, int time, int *global_best)
@@ -140,7 +119,7 @@ int max_score(const Blueprint &bp, std::vector<int> &bag, std::vector<int> &robo
     // recursive call
 
     int best = bag[N - 1];
-    for (int i : get_order(bp, robots))
+    for (int i = 3; i >= 0; --i)
     {
         if (!has_potential(bag, robots, time, *global_best))
             continue;
@@ -187,13 +166,12 @@ void part_one()
 
 void part_two()
 {
-    const auto blueprints_all = read_file("day19.in");
-    const std::vector<Blueprint> blueprints(blueprints_all.begin(), blueprints_all.begin() + 3);
+    const auto blueprints = read_file("day19.in");
     std::vector<int> robots = {1, 0, 0, 0};
     std::vector<int> bag(N);
 
     int solution = 1;
-    for (int i = 0; i < blueprints.size(); ++i)
+    for (int i = 0; i < 3; ++i)
     {
         int global_best = 0;
         auto score = max_score(blueprints[i], bag, robots, 32, &global_best);
@@ -205,5 +183,5 @@ void part_two()
 int main()
 {
     part_one();
-    // part_two();
+    part_two();
 }
