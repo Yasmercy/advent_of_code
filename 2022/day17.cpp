@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 constexpr long long width = 7;
@@ -24,7 +25,7 @@ struct Pieces
 struct Board
 {
     // a row x col representation
-    std::vector<std::vector<long long>> board;
+    std::vector<std::vector<bool>> board;
     long long height = 0;
     long long cleared_height = 0;
 
@@ -35,9 +36,7 @@ struct Board
         piece.row = height + 3;
 
         while ((board.size() + cleared_height) <= piece.row + piece.height)
-        {
-            board.push_back(std::vector<long long>(width, 0));
-        }
+            board.push_back(std::vector<bool>(width, 0));
     }
 
     void setPiece(const Pieces &piece)
@@ -50,10 +49,8 @@ struct Board
         {
             int c = 0;
             for (; c < width; ++c)
-            {
                 if (!board[r - cleared_height][c])
                     break;
-            }
             if (c == width)
             {
                 auto diff = r - cleared_height;
@@ -96,15 +93,37 @@ struct Board
         return false;
     }
 
+    uint64_t hash(uint64_t piece)
+    {
+        // this is a horrible hash and probably won't work
+        // hashes the top 8 rows (pads with 0 if doesnt exist)
+        uint64_t out = 0;
+        for (int r = board.size() - 1; r >= 0 && r >= board.size() - 8; --r)
+            for (int c = 0; c < width; ++c)
+                out = (out << 1) + board[r][c];
+
+        // puts the piece as indices 0-3
+        out <<= 3;
+        out += piece;
+
+        return out;
+    }
+
     void run(long long n, Pieces pieces[N], std::vector<long long> directions)
     {
         long long dir_index = 0;
         long long piece_index = 0;
+        bool skipped = false;
+
+        // height at each piece_index
+        std::vector<long long> heights{0};
+        // piece_index for the last time seen board_state
+        std::unordered_map<uint64_t, long long> pos;
 
         while (piece_index < n)
         {
-            if (piece_index % (10'000'000) == 0)
-                std::cout << piece_index << "\n";
+            if (piece_index % 10'000 == 0)
+                std::cout << piece_index << '\n';
             auto &piece = pieces[piece_index % N];
 
             if (piece.row == -1)
@@ -114,6 +133,27 @@ struct Board
             {
                 setPiece(piece);
                 height = std::max(height, piece.height + piece.row);
+                heights.push_back(height);
+
+                if (!skipped)
+                {
+                    auto h = hash(piece_index % N);
+                    if (auto search = pos.find(h); search != pos.end())
+                    {
+                        // second time we have seen
+                        // we can skip forawrd without simulating
+                        skipped = true;
+                        long long remaining = n - piece_index;
+                        long long period = piece_index - pos[h];
+                        long long cycles = remaining / period;
+                        long long dh = heights[piece_index] - heights[pos[h]];
+                        piece_index += cycles * period;
+                        height += cycles * dh;
+                    }
+                    else
+                        pos.insert({h, piece_index});
+                }
+
                 piece.row = -1;
                 piece.col = 0;
                 ++piece_index;
@@ -195,6 +235,6 @@ void part_two()
 
 int main()
 {
-    part_one();
+    // part_one();
     part_two();
 }
