@@ -1,35 +1,55 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <numeric>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-constexpr long long width = 7;
-constexpr long long N = 5;
+constexpr int64_t width = 7;
+constexpr int64_t N = 5;
 
 struct Pieces
 {
-    Pieces(long long row, long long col, long long width, long long height,
-           std::vector<std::pair<long long, long long>> rel_locations)
+    Pieces(int64_t row, int64_t col, int64_t width, int64_t height,
+           std::vector<std::pair<int64_t, int64_t>> rel_locations)
         : row(row), col(col), width(width), height(height), rel_locations(rel_locations)
     {
     }
-    long long row;
-    long long col;
-    long long width;
-    long long height;
-    std::vector<std::pair<long long, long long>> rel_locations; // relative from topleft
+    int64_t row;
+    int64_t col;
+    int64_t width;
+    int64_t height;
+    std::vector<std::pair<int64_t, int64_t>> rel_locations; // relative from topleft
+};
+
+struct Data
+{
+    uint64_t heights;
+    int64_t index;
+    int64_t position;
+
+    bool operator==(const Data &other) const
+    {
+        return heights == other.heights && position == other.position;
+    }
+};
+
+template <> struct std::hash<Data>
+{
+    std::size_t operator()(const Data &k) const
+    {
+        return hash<uint64_t>()(k.heights) ^ (hash<int64_t>()(k.position) << 1);
+    }
 };
 
 struct Board
 {
     // a row x col representation
     std::vector<std::vector<bool>> board;
-    long long height = 0;
-    long long cleared_height = 0;
+    int64_t height = 0;
+    int64_t cleared_height = 0;
 
     void setDefault(Pieces &piece)
     {
@@ -47,7 +67,7 @@ struct Board
             board[r + piece.row - cleared_height][c + piece.col] = 1;
 
         // check for creating full rows
-        for (long long r = piece.row + piece.height; r >= piece.row; --r)
+        for (int64_t r = piece.row + piece.height; r >= piece.row; --r)
         {
             int c = 0;
             for (; c < width; ++c)
@@ -63,19 +83,19 @@ struct Board
         }
     }
 
-    bool canMove(Pieces &piece, long long dr, long long dc)
+    bool canMove(Pieces &piece, int64_t dr, int64_t dc)
     {
         for (const auto &[r, c] : piece.rel_locations)
         {
-            long long r_new = r + dr + piece.row;
-            long long c_new = c + dc + piece.col;
+            int64_t r_new = r + dr + piece.row;
+            int64_t c_new = c + dc + piece.col;
             if (0 > r_new || 0 > c_new || c_new >= width || board[r_new - cleared_height][c_new])
                 return false;
         }
         return true;
     }
 
-    void movePiece(Pieces &piece, long long dr, long long dc)
+    void movePiece(Pieces &piece, int64_t dr, int64_t dc)
     {
         piece.row += dr;
         piece.col += dc;
@@ -83,7 +103,7 @@ struct Board
 
     // moves the blocks by a direction (0 is left, 1 is right)
     // returns whether it has now set
-    bool move(Pieces &piece, long long dc)
+    bool move(Pieces &piece, int64_t dc)
     {
         if (canMove(piece, 0, dc))
             movePiece(piece, 0, dc);
@@ -95,25 +115,28 @@ struct Board
         return false;
     }
 
-    long long find(const std::vector<std::vector<std::vector<bool>>> &history, std::vector<std::vector<bool>> &cur,
-                   long long cur_piece, long long jump)
+    uint64_t hash_heights()
     {
-        for (long long i = history.size() % jump; i < history.size(); i += jump)
-            if (history[i] == cur)
-                return i;
-        return 0;
+        // uses 8 bits to get the height of each column
+        uint64_t out = 0;
+        for (int col = 0; col < width; ++col)
+        {
+            out <<= 8;
+            uint8_t max = 0;
+            for (int row = board.size() - 1; row >= 0 && max == 0; --row)
+                if (board[row][col])
+                    max = row;
+            out += max;
+        }
+        return out;
     }
 
-    void run(long long n, Pieces pieces[N], std::vector<long long> directions)
+    void run(int64_t n, Pieces pieces[N], std::vector<int64_t> directions)
     {
-        long long dir_index = 0;
-        long long piece_index = 0;
-        bool skipped = false;
+        int64_t dir_index = 0;
+        int64_t piece_index = 0;
 
-        // height at each piece_index
-        std::vector<long long> heights{0};
-        // piece_index for the last time seen board_state
-        std::vector<std::vector<std::vector<bool>>> history;
+        std::unordered_map<Data, int64_t> heights;
 
         while (piece_index < n)
         {
@@ -126,37 +149,34 @@ struct Board
             {
                 setPiece(piece);
                 height = std::max(height, piece.height + piece.row);
-                heights.push_back(height);
-
-                if (!skipped)
-                {
-                    auto last_seen = find(history, board, piece_index % N, N * directions.size());
-                    if (last_seen != 0)
-                    {
-
-                        // second time we have seen
-                        // we can skip forawrd without simulating
-                        skipped = true;
-                        long long remaining = n - piece_index;
-                        long long period = piece_index - last_seen;
-                        long long cycles = remaining / period;
-                        long long dh = heights[piece_index] - heights[last_seen];
-                        piece_index += cycles * period;
-                        height += cycles * dh;
-                        cleared_height += cycles * dh;
-                    }
-                    else
-                        history.push_back(board);
-                }
-
                 piece.row = -1;
                 piece.col = 0;
                 ++piece_index;
+
+                auto m = N * static_cast<int64_t>(directions.size());
+                Data data{hash_heights(), piece_index, dir_index % m};
+
+                auto search = heights.find(data);
+                if (search == heights.end())
+                    heights.insert({data, height});
+                else
+                {
+                    auto old_height = search->second;
+                    auto old_index = search->first.index;
+                    auto period = piece_index - old_index;
+                    auto dh = height - old_height;
+                    auto remaining = n - piece_index;
+                    auto cycles = remaining / period;
+
+                    height += dh * cycles;
+                    cleared_height += dh * cycles;
+                    piece_index += period * cycles;
+                }
             }
         }
     }
 
-    void printRow(long long r)
+    void printRow(int64_t r)
     {
         const auto &row = board[r];
 
@@ -171,15 +191,15 @@ struct Board
 
     void printArray()
     {
-        for (long long i = height - 1 - cleared_height; i >= 0; --i)
+        for (int64_t i = height - 1 - cleared_height; i >= 0; --i)
             printRow(i);
         std::cout << "+------+\n\n";
     }
 };
 
-std::vector<long long> read_file(std::string filename)
+std::vector<int64_t> read_file(std::string filename)
 {
-    std::vector<long long> out;
+    std::vector<int64_t> out;
     std::ifstream ifs(filename);
     char c;
     while (ifs.good())
@@ -204,7 +224,7 @@ void part_one()
     };
 
     Board board;
-    std::vector<long long> directions = read_file("day17.in");
+    std::vector<int64_t> directions = read_file("day17.in");
     board.run(2022, pieces, directions);
 
     std::cout << board.height << "\n";
@@ -222,7 +242,7 @@ void part_two()
     };
 
     Board board;
-    std::vector<long long> directions = read_file("day17.in");
+    std::vector<int64_t> directions = read_file("day17.in");
     board.run(1'000'000'000'000, pieces, directions);
 
     std::cout << board.height << "\n";
