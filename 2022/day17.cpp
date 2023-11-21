@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 constexpr long long width = 7;
@@ -93,20 +95,13 @@ struct Board
         return false;
     }
 
-    uint64_t hash(uint64_t piece)
+    long long find(const std::vector<std::vector<std::vector<bool>>> &history, std::vector<std::vector<bool>> &cur,
+                   long long cur_piece, long long jump)
     {
-        // this is a horrible hash and probably won't work
-        // hashes the top 8 rows (pads with 0 if doesnt exist)
-        uint64_t out = 0;
-        for (int r = board.size() - 1; r >= 0 && r >= board.size() - 8; --r)
-            for (int c = 0; c < width; ++c)
-                out = (out << 1) + board[r][c];
-
-        // puts the piece as indices 0-3
-        out <<= 3;
-        out += piece;
-
-        return out;
+        for (long long i = history.size() % jump; i < history.size(); i += jump)
+            if (history[i] == cur)
+                return i;
+        return 0;
     }
 
     void run(long long n, Pieces pieces[N], std::vector<long long> directions)
@@ -118,12 +113,10 @@ struct Board
         // height at each piece_index
         std::vector<long long> heights{0};
         // piece_index for the last time seen board_state
-        std::unordered_map<uint64_t, long long> pos;
+        std::vector<std::vector<std::vector<bool>>> history;
 
         while (piece_index < n)
         {
-            if (piece_index % 10'000 == 0)
-                std::cout << piece_index << '\n';
             auto &piece = pieces[piece_index % N];
 
             if (piece.row == -1)
@@ -137,21 +130,23 @@ struct Board
 
                 if (!skipped)
                 {
-                    auto h = hash(piece_index % N);
-                    if (auto search = pos.find(h); search != pos.end())
+                    auto last_seen = find(history, board, piece_index % N, N * directions.size());
+                    if (last_seen != 0)
                     {
+
                         // second time we have seen
                         // we can skip forawrd without simulating
                         skipped = true;
                         long long remaining = n - piece_index;
-                        long long period = piece_index - pos[h];
+                        long long period = piece_index - last_seen;
                         long long cycles = remaining / period;
-                        long long dh = heights[piece_index] - heights[pos[h]];
+                        long long dh = heights[piece_index] - heights[last_seen];
                         piece_index += cycles * period;
                         height += cycles * dh;
+                        cleared_height += cycles * dh;
                     }
                     else
-                        pos.insert({h, piece_index});
+                        history.push_back(board);
                 }
 
                 piece.row = -1;
