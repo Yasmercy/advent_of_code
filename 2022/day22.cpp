@@ -96,11 +96,30 @@ struct Cube
         return {new_nodes, new_edges};
     };
 
+    bool has_edge(const Point &a, const Point &b) const
+    {
+        if (edges.contains(a) && std::find(edges.at(a).begin(), edges.at(a).end(), b) != edges.at(a).end())
+            return true;
+        if (edges.contains(b) && std::find(edges.at(b).begin(), edges.at(b).end(), a) != edges.at(b).end())
+            return true;
+        return false;
+    }
+
     bool is_cube(const Cube &reference) const
     {
+        int count = 0;
+        for (const auto &[_, value] : edges)
+            count += value.size() == 3;
+        if (count == 8)
+            std::cout << "aa\n";
+
         // checking isomorphism
         const auto &canon = canonical_form();
-        return canon.edges == reference.edges;
+        for (const auto &[key, value] : reference.edges)
+            for (const auto &to : value)
+                if (!has_edge(key, to))
+                    return false;
+        return true;
     }
 
     void init_junctions(std::vector<Point> &unknown, std::vector<std::vector<Point>> &junctions) const
@@ -140,6 +159,61 @@ struct Cube
         for (int i = 0; i < junctions.size() && index < points.size(); ++i)
             if (junctions[i].size() < 3)
                 junctions[i--].push_back(points[index++]);
+        for (int i = 0; i < junctions.size(); ++i)
+            std::sort(junctions[i].begin(), junctions[i].end());
+    }
+
+    bool correct_test_junctions(const std::vector<std::vector<Point>> &junctions) const
+    {
+        std::vector<Point> m{{0, 8},   // NOLINT
+                             {4, 0},   // NOLINT
+                             {4, 4},   // NOLINT
+                             {4, 8},   // NOLINT
+                             {8, 8},   // NOLINT
+                             {8, 12},  // NOLINT
+                             {3, 8},   // NOLINT
+                             {3, 11},  // NOLINT
+                             {0, 11},  // NOLINT
+                             {7, 0},   // NOLINT
+                             {7, 3},   // NOLINT
+                             {4, 3},   // NOLINT
+                             {7, 4},   // NOLINT
+                             {7, 7},   // NOLINT
+                             {4, 7},   // NOLINT
+                             {7, 8},   // NOLINT
+                             {7, 11},  // NOLINT
+                             {4, 11},  // NOLINT
+                             {11, 8},  // NOLINT
+                             {11, 11}, // NOLINT
+                             {8, 11},  // NOLINT
+                             {11, 12}, // NOLINT
+                             {11, 15}, // NOLINT
+                             {8, 15}};
+        std::sort(m.begin(), m.end());
+
+        std::vector<std::vector<int>> solution_int = {
+            {3, 8, 9},    // NOLINT
+            {14, 15, 17}, // NOLINT
+            {16, 18, 19}, // NOLINT
+            {2, 5, 20},   // NOLINT
+            {4, 10, 24},  // NOLINT
+            {12, 13, 21}, // NOLINT
+            {1, 6, 7},    // NOLINT
+            {11, 22, 23}, // NOLINT
+        };
+
+        std::vector<std::vector<Point>> solution;
+        for (int i = 0; i < solution_int.size(); ++i)
+        {
+            solution.push_back({});
+            for (int j : solution_int[i])
+                solution[i].push_back(m[j - 1]);
+        }
+
+        for (const auto &j : junctions)
+            if (auto search = std::find(solution.begin(), solution.end(), j); search == solution.end())
+                return false;
+        return true;
     }
 
     std::map<Point, std::vector<Point>> union_junction_edges(const std::vector<std::vector<Point>> &junctions,
@@ -148,12 +222,19 @@ struct Cube
         std::map<Point, Point> to_canon;
         for (const auto &junction : junctions)
             for (const auto &node : junction)
-                to_canon.insert({node, *std::min_element(junction.begin(), junction.end())});
+                to_canon.insert({node, junction[0]});
 
         std::map<Point, std::vector<Point>> out;
         for (const auto &[key, value] : edges)
             for (const auto &node : value)
-                out[to_canon[key]].push_back(to_canon[node]);
+            {
+                auto &insert = out[to_canon[key]];
+                if (auto search = std::find(insert.begin(), insert.end(), to_canon[node]); search == insert.end())
+                    insert.push_back(to_canon[node]);
+                auto &insert1 = out[to_canon[node]];
+                if (auto search = std::find(insert1.begin(), insert1.end(), to_canon[key]); search == insert1.end())
+                    insert1.push_back(to_canon[key]);
+            }
         return out;
     }
 
@@ -169,16 +250,25 @@ struct Cube
             std::vector<std::vector<Point>> junctions_cp = junctions;
             push_junctions(unknown, junctions_cp);
 
+            std::vector<Point> sol = {
+                {0, 8}, {11, 15}, {11, 8}, {7, 0}, {0, 11}, {4, 0},
+            };
+            if (unknown == sol)
+                std::cout << "AA\n";
+
+            if (correct_test_junctions(junctions_cp))
+                std::cout << "AAAAAAAAA\n";
+
             std::vector<Point> new_nodes;
-            for (const auto &j : junctions_cp)
-                new_nodes.push_back(*std::min_element(j.begin(), j.end()));
+            for (const auto &junction : junctions_cp)
+                new_nodes.push_back(junction[0]);
             auto new_edges = union_junction_edges(junctions_cp, edges);
 
             if (Cube{new_nodes, new_edges}.is_cube(reference))
                 return {junctions, edges};
         } while (std::next_permutation(unknown.begin(), unknown.end()));
 
-        throw std::runtime_error("breaking");
+        throw std::runtime_error("cannot become cube");
     }
 };
 
