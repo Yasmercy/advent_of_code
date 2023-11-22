@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-const int SIZE = 4;
+const int SIZE = 50;
 
 struct Point
 {
@@ -107,11 +107,7 @@ struct Cube
 
     bool has_edge(const Point &a, const Point &b) const
     {
-        if (edges.contains(b) && edges.at(b).contains(a))
-            return true;
-        if (edges.contains(a) && edges.at(a).contains(b))
-            return true;
-        return false;
+        return edges.contains(b) && edges.at(b).contains(a) && edges.contains(a) && edges.at(a).contains(b);
     }
 
     bool equal(const Cube &other) const
@@ -409,6 +405,7 @@ Cube build_disconnected_cube(const std::map<Point, bool> mask)
         edges[c].insert(d);
     }
 
+    std::sort(corners.begin(), corners.end());
     return {corners, edges};
 }
 
@@ -544,36 +541,36 @@ std::pair<Point, int> simulate(const Graph &graph, const std::vector<int> &moves
     int dir = 0;
     Point pos = start;
 
-    //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
-
     for (int i = 0; i < moves.size() / 2; ++i)
     {
         for (int k = 0; k < moves[2 * i]; ++k)
         {
             int tmp_dir = dir;
+            Point tmp_pos = pos;
             dir = graph.facing.at(pos)[tmp_dir];
             pos = graph.data.at(pos)[tmp_dir];
-            //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
+            if (pos == tmp_pos)
+            {
+                dir = tmp_dir;
+                break;
+            }
         }
         dir = (dir + 4 + moves[2 * i + 1]) % 4;
-        //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
     }
 
     for (int k = 0; k < moves.back(); ++k)
-    {
         pos = graph.data.at(pos)[dir];
-        //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
-    }
 
     return {pos, dir};
 }
 
 void part_one()
 {
-    const auto &[w, h] = get_dimensions("day22.in");
-    const auto &mask = get_mask("day22.in", w, h);
+    const auto& filename = "day22.in";
+    const auto &[w, h] = get_dimensions(filename);
+    const auto &mask = get_mask(filename, w, h);
     const auto &graph = get_graph1(mask, w, h);
-    const auto &moves = get_moves("day22.in");
+    const auto &moves = get_moves(filename);
     const auto &start = get_start(mask);
 
     const auto &[point, facing] = simulate(graph, moves, start);
@@ -582,10 +579,11 @@ void part_one()
 
 void part_two()
 {
-    const auto &[w, h] = get_dimensions("day22.in");
-    const auto &mask = get_mask("day22.in", w, h);
+    const auto& filename = "day22.in";
+    const auto &[w, h] = get_dimensions(filename);
+    const auto &mask = get_mask(filename, w, h);
     const auto &graph = get_graph2(mask, w, h);
-    const auto &moves = get_moves("day22.in");
+    const auto &moves = get_moves(filename);
     const auto &start = get_start(mask);
 
     const auto &[point, facing] = simulate(graph, moves, start);
