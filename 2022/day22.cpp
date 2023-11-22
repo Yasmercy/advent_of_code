@@ -9,14 +9,19 @@
 
 struct Point
 {
-    int row;
-    int col;
+    int row = 0;
+    int col = 0;
 
     auto operator<=>(const Point &) const = default;
 
     Point operator+(const Point &other) const
     {
         return {row + other.row, col + other.col};
+    }
+
+    Point operator-(const Point &other) const
+    {
+        return {row - other.row, col - other.col};
     }
 
     bool in_bounds(int width, int height) const
@@ -125,8 +130,6 @@ struct Cube
         std::vector<int> remap = {0, 1, 2, 3, 4, 5, 6, 7};
         do
         {
-            if (remap == std::vector<int>{1, 2, 4, 3, 0, 5, 7, 6})
-                std::cout << "correct remap\n";
             const auto &canon = shuffle(remap);
             if (canon.equal(reference))
                 return true;
@@ -178,59 +181,6 @@ struct Cube
             std::sort(junctions[i].begin(), junctions[i].end());
     }
 
-    bool correct_test_junctions(const std::vector<std::vector<Point>> &junctions) const
-    {
-        std::vector<Point> m{{0, 8},   // NOLINT
-                             {4, 0},   // NOLINT
-                             {4, 4},   // NOLINT
-                             {4, 8},   // NOLINT
-                             {8, 8},   // NOLINT
-                             {8, 12},  // NOLINT
-                             {3, 8},   // NOLINT
-                             {3, 11},  // NOLINT
-                             {0, 11},  // NOLINT
-                             {7, 0},   // NOLINT
-                             {7, 3},   // NOLINT
-                             {4, 3},   // NOLINT
-                             {7, 4},   // NOLINT
-                             {7, 7},   // NOLINT
-                             {4, 7},   // NOLINT
-                             {7, 8},   // NOLINT
-                             {7, 11},  // NOLINT
-                             {4, 11},  // NOLINT
-                             {11, 8},  // NOLINT
-                             {11, 11}, // NOLINT
-                             {8, 11},  // NOLINT
-                             {11, 12}, // NOLINT
-                             {11, 15}, // NOLINT
-                             {8, 15}};
-        std::sort(m.begin(), m.end());
-
-        std::vector<std::vector<int>> solution_int = {
-            {3, 8, 9},    // NOLINT
-            {14, 15, 17}, // NOLINT
-            {16, 18, 19}, // NOLINT
-            {2, 5, 24},   // NOLINT
-            {4, 10, 20},  // NOLINT
-            {12, 13, 21}, // NOLINT
-            {1, 6, 7},    // NOLINT
-            {11, 22, 23}, // NOLINT
-        };
-
-        std::vector<std::vector<Point>> solution;
-        for (int i = 0; i < solution_int.size(); ++i)
-        {
-            solution.push_back({});
-            for (int j : solution_int[i])
-                solution[i].push_back(m[j - 1]);
-        }
-
-        for (const auto &j : junctions)
-            if (auto search = std::find(solution.begin(), solution.end(), j); search == solution.end())
-                return false;
-        return true;
-    }
-
     std::map<Point, std::set<Point>> union_junction_edges(const std::vector<std::vector<Point>> &junctions,
                                                           const std::map<Point, std::set<Point>> &edges) const
     {
@@ -249,7 +199,7 @@ struct Cube
         return out;
     }
 
-    std::pair<std::vector<std::vector<Point>>, std::map<Point, std::set<Point>>> connect_cube() const
+    std::vector<std::vector<Point>> connect_cube() const
     {
         const auto &reference = reference_cube();
         std::vector<Point> unknown;
@@ -261,19 +211,13 @@ struct Cube
             std::vector<std::vector<Point>> junctions_cp = junctions;
             push_junctions(unknown, junctions_cp);
 
-            std::vector<Point> sol = {
-                {0, 8}, {11, 15}, {11, 8}, {7, 0}, {0, 11}, {4, 0},
-            };
-            if (correct_test_junctions(junctions_cp))
-                std::cout << "AAAAAAAAA\n";
-
             std::vector<Point> new_nodes;
             for (const auto &junction : junctions_cp)
                 new_nodes.push_back(junction[0]);
             auto new_edges = union_junction_edges(junctions_cp, edges);
 
             if (Cube{new_nodes, new_edges}.is_cube(reference))
-                return {junctions, edges};
+                return junctions_cp;
         } while (std::next_permutation(unknown.begin(), unknown.end()));
 
         throw std::runtime_error("cannot become cube");
@@ -465,6 +409,79 @@ Cube build_disconnected_cube(const std::map<Point, bool> mask)
     return {corners, edges};
 }
 
+std::vector<Point> get_wrap2(const Point &cur, const std::map<Point, bool> &mask, const Cube &cube,
+                             std::vector<std::vector<Point>> junctions)
+{
+    std::vector<Point> out(4);
+    std::vector<Point> directions = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+
+    // 1) check if on the edge -> return nothing if is not
+    // 2) check if on the corner -> return the node in the junction that is 1 away
+    // 3) check the adjacent edge -> return the same distance away
+    for (int i = 0; i < 4; ++i)
+    {
+        // not on edge
+        if (mask.contains(cur + directions[i]))
+            continue;
+
+        // on corner
+        int k = 0;
+        for (; k < junctions.size(); ++k)
+            if (std::find(junctions[k].begin(), junctions[k].end(), cur) != junctions[k].end())
+                break;
+        if (k != junctions.size())
+        {
+            std::cout << "aa\n";
+        }
+
+        // find adjacent edge
+        Point c1;
+        Point c2;
+        for (int i = 0; i < cube.nodes.size(); ++i)
+            for (int j = i + 1; j < cube.nodes.size(); ++j)
+                if (((cube.nodes[i].row == cur.row && cube.nodes[j].row == cur.row) ||
+                     (cube.nodes[i].col == cur.col && cube.nodes[j].col == cur.col)))
+                {
+                    c1 = cube.nodes[i];
+                    c2 = cube.nodes[j];
+                }
+        int j1 = 0;
+        int j2 = 0;
+        for (; j1 < junctions.size(); ++j1)
+            if (std::find(junctions[j1].begin(), junctions[j1].end(), c1) != junctions[j1].end())
+                break;
+        for (; j2 < junctions.size(); ++j2)
+            if (std::find(junctions[j2].begin(), junctions[j2].end(), c2) != junctions[j2].end())
+                break;
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+            {
+                if (junctions[j1][i] == c1)
+                    ++i;
+                if (junctions[j2][j] == c2)
+                    ++j;
+
+                // if they're in the same junction
+                // then find the distance from cur to c1 and add the direction of c2->junctions[j2][j]
+                bool same = false;
+                for (const auto &j : junctions)
+                    if (std::find(j.begin(), j.end(), c1) != j.end() && std::find(j.begin(), j.end(), c2) != j.end())
+                        same = true;
+                if (same)
+                {
+                    int dist = cur.manhattan(c1);
+                    Point dir = junctions[j2][j] - c2;
+                    if (dir.row != 0)
+                        dir.row = dir.row / std::abs(dir.row) * dist;
+                    if (dir.col != 0)
+                        dir.col = dir.col / std::abs(dir.col) * dist;
+                    out[i] = cur + dir;
+                }
+            }
+    }
+    return out;
+}
+
 Graph get_graph2(const std::map<Point, bool> mask, int w, int h)
 {
     Graph g;
@@ -472,7 +489,16 @@ Graph get_graph2(const std::map<Point, bool> mask, int w, int h)
     g.height = h;
 
     const auto &cube = build_disconnected_cube(mask);
-    const auto &[junctions, edges] = cube.connect_cube();
+    const auto &junctions = cube.connect_cube();
+
+    for (int r = 0; r < h; ++r)
+        for (int c = 0; c < w; ++c)
+            if (mask.contains({r, c}) && mask.at({r, c}) == 0)
+            {
+                const Point &cur = {r, c};
+                const auto &wrap = get_wrap2(cur, mask, cube, junctions);
+                g.data.insert({cur, get_edges(cur, wrap, mask, w, h)});
+            }
 
     return g;
 }
