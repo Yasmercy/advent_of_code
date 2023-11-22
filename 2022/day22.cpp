@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+const int SIZE = 4;
+
 struct Point
 {
     int row = 0;
@@ -308,7 +310,6 @@ std::vector<int> get_moves(const std::string &filename)
 
 std::vector<Point> get_corners(const std::map<Point, bool> mask)
 {
-    const int SIZE = 4;
 
     // corners are on multiples of SIZE (for both row and col)
     std::vector<Point> out;
@@ -377,6 +378,24 @@ Graph get_graph1(const std::map<Point, bool> mask, int w, int h)
     return g;
 }
 
+std::pair<Point, int> simulate1(const Graph &graph, const std::vector<int> &moves, const Point &start)
+{
+    int dir = 0;
+    Point pos = start;
+
+    for (int i = 0; i < moves.size() / 2; ++i)
+    {
+        for (int k = 0; k < moves[2 * i]; ++k)
+            pos = graph.data.at(pos)[dir];
+        dir = (dir + 4 + moves[2 * i + 1]) % 4;
+    }
+
+    for (int k = 0; k < moves.back(); ++k)
+        pos = graph.data.at(pos)[dir];
+
+    return {pos, dir};
+}
+
 Cube build_disconnected_cube(const std::map<Point, bool> mask)
 {
     std::vector<Point> corners = get_corners(mask);
@@ -409,76 +428,97 @@ Cube build_disconnected_cube(const std::map<Point, bool> mask)
     return {corners, edges};
 }
 
+std::pair<Point, Point> matching_points(const Point &c1, const Point &c2, const Cube &cube,
+                                        const std::vector<std::vector<Point>> &junctions)
+{
+    // 1) find the two junctions that they both are at
+    // 2) find the two other points in each junction that also have a connection
+    int j1 = 0;
+    int j2 = 0;
+    for (int i = 0; i < junctions.size(); ++i)
+    {
+        auto j = junctions[i];
+        if (std::find(j.begin(), j.end(), c1) != j.end())
+            j1 = i;
+        if (std::find(j.begin(), j.end(), c2) != j.end())
+            j2 = i;
+    }
+
+    for (int i = 0; i < 3; ++i)
+    {
+        i += (junctions[j1][i] == c1);
+        for (int j = 0; j < 3; ++j)
+        {
+            j += (junctions[j1][i] == c1);
+            if (cube.has_edge(junctions[j1][i], junctions[j2][j]))
+                return {junctions[j1][i], junctions[j2][j]};
+        }
+    }
+
+    throw std::runtime_error("cannot find matching junction");
+}
+
 std::vector<Point> get_wrap2(const Point &cur, const std::map<Point, bool> &mask, const Cube &cube,
-                             std::vector<std::vector<Point>> junctions)
+                             const std::vector<std::vector<Point>> &junctions)
 {
     std::vector<Point> out(4);
     std::vector<Point> directions = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
 
-    // 1) check if on the edge -> return nothing if is not
-    // 2) check if on the corner -> return the node in the junction that is 1 away
-    // 3) check the adjacent edge -> return the same distance away
+    // find the two corners that cur is the closest to (3 if on the corner)
+
+    Point closest = cube.nodes[0];
+    for (const auto &corner : cube.nodes)
+        if (closest.manhattan(cur) > corner.manhattan(cur))
+            closest = corner;
+
+    std::vector<Point> second{closest};
+
+    for (const auto &corner : cube.nodes)
+    {
+        if (corner == closest)
+            continue;
+        if ((corner.row / SIZE == cur.row / SIZE && corner.col / SIZE == cur.col / SIZE) &&
+            (closest.row == corner.row || closest.col == corner.col) &&
+            ((second[0] == closest) || (second[0].manhattan(cur) > corner.manhattan(cur))))
+            second[0] = corner;
+    }
+    if (closest == cur)
+    {
+        const auto &e = cube.edges.at(cur);
+        second = std::vector<Point>(e.begin(), e.end());
+    }
+
+    // fill out the wraps return vector
+    if (cur.row != closest.row && cur.col != closest.col)
+        return out;
+
     for (int i = 0; i < 4; ++i)
     {
-        // not on edge
-        if (mask.contains(cur + directions[i]))
-            continue;
+        // the other point that defines the edge we are on
+        // use the one that is perpendicular to direction if on corner
+        Point other;
+        if (second.size() == 1)
+            other = second[0];
+        else if (directions[i].row == 0 && closest.col == second[0].col)
+            other = second[0];
+        else if (directions[i].col == 0 && closest.row == second[0].row)
+            other = second[0];
+        else if (directions[i].row == 0 && closest.col == second[1].col)
+            other = second[1];
+        else if (directions[i].col == 0 && closest.row == second[1].row)
+            other = second[1];
 
-        // on corner
-        int k = 0;
-        for (; k < junctions.size(); ++k)
-            if (std::find(junctions[k].begin(), junctions[k].end(), cur) != junctions[k].end())
-                break;
-        if (k != junctions.size())
-        {
-            std::cout << "aa\n";
-        }
+        const auto &[c1, c2] = matching_points(closest, other, cube, junctions);
 
-        // find adjacent edge
-        Point c1;
-        Point c2;
-        for (int i = 0; i < cube.nodes.size(); ++i)
-            for (int j = i + 1; j < cube.nodes.size(); ++j)
-                if (((cube.nodes[i].row == cur.row && cube.nodes[j].row == cur.row) ||
-                     (cube.nodes[i].col == cur.col && cube.nodes[j].col == cur.col)))
-                {
-                    c1 = cube.nodes[i];
-                    c2 = cube.nodes[j];
-                }
-        int j1 = 0;
-        int j2 = 0;
-        for (; j1 < junctions.size(); ++j1)
-            if (std::find(junctions[j1].begin(), junctions[j1].end(), c1) != junctions[j1].end())
-                break;
-        for (; j2 < junctions.size(); ++j2)
-            if (std::find(junctions[j2].begin(), junctions[j2].end(), c2) != junctions[j2].end())
-                break;
-        for (int i = 0; i < 3; ++i)
-            for (int j = 0; j < 3; ++j)
-            {
-                if (junctions[j1][i] == c1)
-                    ++i;
-                if (junctions[j2][j] == c2)
-                    ++j;
-
-                // if they're in the same junction
-                // then find the distance from cur to c1 and add the direction of c2->junctions[j2][j]
-                bool same = false;
-                for (const auto &j : junctions)
-                    if (std::find(j.begin(), j.end(), c1) != j.end() && std::find(j.begin(), j.end(), c2) != j.end())
-                        same = true;
-                if (same)
-                {
-                    int dist = cur.manhattan(c1);
-                    Point dir = junctions[j2][j] - c2;
-                    if (dir.row != 0)
-                        dir.row = dir.row / std::abs(dir.row) * dist;
-                    if (dir.col != 0)
-                        dir.col = dir.col / std::abs(dir.col) * dist;
-                    out[i] = cur + dir;
-                }
-            }
+        Point dir = c2 - c1;
+        int dist = closest.manhattan(cur);
+        if (dir.row != 0)
+            dir.row = dir.row / std::abs(dir.row) * dist;
+        if (dir.col != 0)
+            dir.col = dir.col / std::abs(dir.col) * dist;
+        out[i] = c1 + dir;
     }
+
     return out;
 }
 
@@ -503,7 +543,7 @@ Graph get_graph2(const std::map<Point, bool> mask, int w, int h)
     return g;
 }
 
-std::pair<Point, int> simulate(const Graph &graph, const std::vector<int> &moves, const Point &start)
+std::pair<Point, int> simulate2(const Graph &graph, const std::vector<int> &moves, const Point &start)
 {
     int dir = 0;
     Point pos = start;
@@ -529,7 +569,7 @@ void part_one()
     const auto &moves = get_moves("day22.in");
     const auto &start = get_start(mask);
 
-    const auto &[point, facing] = simulate(graph, moves, start);
+    const auto &[point, facing] = simulate1(graph, moves, start);
     std::cout << (point.row + 1) * 1000 + 4 * (point.col + 1) + facing << '\n';
 }
 
@@ -538,6 +578,11 @@ void part_two()
     const auto &[w, h] = get_dimensions("day22.in");
     const auto &mask = get_mask("day22.in", w, h);
     const auto &graph = get_graph2(mask, w, h);
+    const auto &moves = get_moves("day22.in");
+    const auto &start = get_start(mask);
+
+    const auto &[point, facing] = simulate2(graph, moves, start);
+    std::cout << (point.row + 1) * 1000 + 4 * (point.col + 1) + facing << '\n';
 }
 
 int main()
