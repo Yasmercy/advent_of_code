@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -44,7 +45,7 @@ struct Graph
 struct Cube
 {
     std::vector<Point> nodes;
-    std::map<Point, std::vector<Point>> edges;
+    std::map<Point, std::set<Point>> edges;
 
     Cube reference_cube() const
     {
@@ -58,20 +59,20 @@ struct Cube
             {2, 1}, // NOLINT
             {3, 1}, // NOLINT
         };
-        std::map<Point, std::vector<Point>> edges = {
-            {nodes[0], {nodes[1], nodes[3], nodes[4]}},
-            {nodes[1], {nodes[2], nodes[5]}},
-            {nodes[2], {nodes[6]}},
-            {nodes[3], {nodes[2], nodes[7]}},
-            {nodes[4], {nodes[5], nodes[7]}},
-            {nodes[5], {nodes[6]}},
-            {nodes[7], {nodes[6]}},
+        std::map<Point, std::set<Point>> edges = {
+            {nodes[0], {nodes[1], nodes[2], nodes[4]}},
+            {nodes[1], {nodes[3], nodes[5]}},
+            {nodes[2], {nodes[3], nodes[6]}},
+            {nodes[3], {nodes[7]}},
+            {nodes[4], {nodes[5], nodes[6]}},
+            {nodes[5], {nodes[7]}},
+            {nodes[6], {nodes[7]}},
         };
 
         return {nodes, edges};
     }
 
-    Cube canonical_form() const
+    Cube shuffle(const std::vector<int> &remap) const
     {
         std::vector<Point> new_nodes = {
             {0, 0}, // NOLINT
@@ -84,42 +85,53 @@ struct Cube
             {3, 1}, // NOLINT
         };
 
-        std::map<Point, Point> remap;
+        std::map<Point, Point> unmap;
         for (int i = 0; i < new_nodes.size(); ++i)
-            remap.insert({nodes[i], new_nodes[i]});
+            unmap.insert({nodes[i], new_nodes[remap[i]]});
 
-        std::map<Point, std::vector<Point>> new_edges;
-        for (const auto &node : nodes)
-            for (const auto &to : edges.at(node))
-                new_edges[remap[node]].push_back(remap[to]);
+        std::map<Point, std::set<Point>> new_edges;
+        for (const auto &key : nodes)
+            for (const auto &p : edges.at(key))
+                new_edges[unmap[key]].insert(unmap[p]);
 
         return {new_nodes, new_edges};
     };
 
     bool has_edge(const Point &a, const Point &b) const
     {
-        if (edges.contains(a) && std::find(edges.at(a).begin(), edges.at(a).end(), b) != edges.at(a).end())
+        if (edges.contains(b) && edges.at(b).contains(a))
             return true;
-        if (edges.contains(b) && std::find(edges.at(b).begin(), edges.at(b).end(), a) != edges.at(b).end())
+        if (edges.contains(a) && edges.at(a).contains(b))
             return true;
         return false;
     }
 
-    bool is_cube(const Cube &reference) const
+    bool equal(const Cube &other) const
     {
-        int count = 0;
-        for (const auto &[_, value] : edges)
-            count += value.size() == 3;
-        if (count == 8)
-            std::cout << "aa\n";
-
-        // checking isomorphism
-        const auto &canon = canonical_form();
-        for (const auto &[key, value] : reference.edges)
+        for (const auto &[key, value] : other.edges)
             for (const auto &to : value)
                 if (!has_edge(key, to))
                     return false;
         return true;
+    }
+
+    bool is_cube(const Cube &reference) const
+    {
+        for (const auto &[_, value] : edges)
+            if (value.size() != 3)
+                return false;
+
+        // checking isomorphism
+        std::vector<int> remap = {0, 1, 2, 3, 4, 5, 6, 7};
+        do
+        {
+            if (remap == std::vector<int>{1, 2, 4, 3, 0, 5, 7, 6})
+                std::cout << "correct remap\n";
+            const auto &canon = shuffle(remap);
+            if (canon.equal(reference))
+                return true;
+        } while (std::next_permutation(remap.begin(), remap.end()));
+        return false;
     }
 
     void init_junctions(std::vector<Point> &unknown, std::vector<std::vector<Point>> &junctions) const
@@ -138,7 +150,7 @@ struct Cube
                 junctions[in_junction].push_back(nodes[i]);
         }
 
-        while (junctions.size() > 8)
+        while (true)
         {
             int min = 0;
             int min_size = 3;
@@ -148,9 +160,12 @@ struct Cube
                     min_size = junctions[i].size();
                     min = i;
                 }
+            if (min_size > 1)
+                break;
             std::move(junctions[min].begin(), junctions[min].end(), std::back_inserter(unknown));
             junctions.erase(junctions.begin() + min);
         }
+        junctions.resize(8);
     }
 
     void push_junctions(const std::vector<Point> &points, std::vector<std::vector<Point>> &junctions) const
@@ -195,8 +210,8 @@ struct Cube
             {3, 8, 9},    // NOLINT
             {14, 15, 17}, // NOLINT
             {16, 18, 19}, // NOLINT
-            {2, 5, 20},   // NOLINT
-            {4, 10, 24},  // NOLINT
+            {2, 5, 24},   // NOLINT
+            {4, 10, 20},  // NOLINT
             {12, 13, 21}, // NOLINT
             {1, 6, 7},    // NOLINT
             {11, 22, 23}, // NOLINT
@@ -216,29 +231,25 @@ struct Cube
         return true;
     }
 
-    std::map<Point, std::vector<Point>> union_junction_edges(const std::vector<std::vector<Point>> &junctions,
-                                                             const std::map<Point, std::vector<Point>> &edges) const
+    std::map<Point, std::set<Point>> union_junction_edges(const std::vector<std::vector<Point>> &junctions,
+                                                          const std::map<Point, std::set<Point>> &edges) const
     {
         std::map<Point, Point> to_canon;
         for (const auto &junction : junctions)
             for (const auto &node : junction)
                 to_canon.insert({node, junction[0]});
 
-        std::map<Point, std::vector<Point>> out;
+        std::map<Point, std::set<Point>> out;
         for (const auto &[key, value] : edges)
             for (const auto &node : value)
             {
-                auto &insert = out[to_canon[key]];
-                if (auto search = std::find(insert.begin(), insert.end(), to_canon[node]); search == insert.end())
-                    insert.push_back(to_canon[node]);
-                auto &insert1 = out[to_canon[node]];
-                if (auto search = std::find(insert1.begin(), insert1.end(), to_canon[key]); search == insert1.end())
-                    insert1.push_back(to_canon[key]);
+                out[to_canon[key]].insert(to_canon[node]);
+                out[to_canon[node]].insert(to_canon[key]);
             }
         return out;
     }
 
-    std::pair<std::vector<std::vector<Point>>, std::map<Point, std::vector<Point>>> connect_cube() const
+    std::pair<std::vector<std::vector<Point>>, std::map<Point, std::set<Point>>> connect_cube() const
     {
         const auto &reference = reference_cube();
         std::vector<Point> unknown;
@@ -253,9 +264,6 @@ struct Cube
             std::vector<Point> sol = {
                 {0, 8}, {11, 15}, {11, 8}, {7, 0}, {0, 11}, {4, 0},
             };
-            if (unknown == sol)
-                std::cout << "AA\n";
-
             if (correct_test_junctions(junctions_cp))
                 std::cout << "AAAAAAAAA\n";
 
@@ -428,7 +436,7 @@ Graph get_graph1(const std::map<Point, bool> mask, int w, int h)
 Cube build_disconnected_cube(const std::map<Point, bool> mask)
 {
     std::vector<Point> corners = get_corners(mask);
-    std::map<Point, std::vector<Point>> edges;
+    std::map<Point, std::set<Point>> edges;
 
     for (int i = 0; i < 6; ++i)
     {
@@ -444,10 +452,14 @@ Cube build_disconnected_cube(const std::map<Point, bool> mask)
         corners.push_back(c);
         corners.push_back(d);
 
-        edges[a].push_back(b);
-        edges[a].push_back(d);
-        edges[b].push_back(c);
-        edges[d].push_back(c);
+        edges[a].insert(b);
+        edges[a].insert(d);
+        edges[b].insert(c);
+        edges[d].insert(c);
+        edges[b].insert(a);
+        edges[d].insert(a);
+        edges[c].insert(b);
+        edges[c].insert(d);
     }
 
     return {corners, edges};
