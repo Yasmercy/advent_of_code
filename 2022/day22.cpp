@@ -45,6 +45,7 @@ struct Graph
 
     // EAST, SOUTH, WEST, NORTH
     std::map<Point, std::vector<Point>> data;
+    std::map<Point, std::vector<int>> facing;
     int width;
     int height;
 };
@@ -373,27 +374,10 @@ Graph get_graph1(const std::map<Point, bool> mask, int w, int h)
                 const Point &cur = {r, c};
                 const auto &wrap = get_wrap1(cur, mask, w, h);
                 g.data.insert({cur, get_edges(cur, wrap, mask, w, h)});
+                g.facing.insert({cur, {0, 1, 2, 3}});
             }
 
     return g;
-}
-
-std::pair<Point, int> simulate1(const Graph &graph, const std::vector<int> &moves, const Point &start)
-{
-    int dir = 0;
-    Point pos = start;
-
-    for (int i = 0; i < moves.size() / 2; ++i)
-    {
-        for (int k = 0; k < moves[2 * i]; ++k)
-            pos = graph.data.at(pos)[dir];
-        dir = (dir + 4 + moves[2 * i + 1]) % 4;
-    }
-
-    for (int k = 0; k < moves.back(); ++k)
-        pos = graph.data.at(pos)[dir];
-
-    return {pos, dir};
 }
 
 Cube build_disconnected_cube(const std::map<Point, bool> mask)
@@ -407,9 +391,9 @@ Cube build_disconnected_cube(const std::map<Point, bool> mask)
         int row = a.row;
         int col = a.col;
 
-        Point b = {row + 3, col};
-        Point c = {row + 3, col + 3};
-        Point d = {row, col + 3};
+        Point b = {row + SIZE - 1, col};
+        Point c = {row + SIZE - 1, col + SIZE - 1};
+        Point d = {row, col + SIZE - 1};
 
         corners.push_back(b);
         corners.push_back(c);
@@ -458,11 +442,13 @@ std::pair<Point, Point> matching_points(const Point &c1, const Point &c2, const 
     throw std::runtime_error("cannot find matching junction");
 }
 
-std::vector<Point> get_wrap2(const Point &cur, const std::map<Point, bool> &mask, const Cube &cube,
-                             const std::vector<std::vector<Point>> &junctions)
+std::pair<std::vector<Point>, std::vector<int>> get_wrap2(const Point &cur, const std::map<Point, bool> &mask,
+                                                          const Cube &cube,
+                                                          const std::vector<std::vector<Point>> &junctions)
 {
     std::vector<Point> out(4);
     std::vector<Point> directions = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+    std::vector<int> facing = {0, 1, 2, 3};
 
     // find the two corners that cur is the closest to (3 if on the corner)
 
@@ -490,7 +476,7 @@ std::vector<Point> get_wrap2(const Point &cur, const std::map<Point, bool> &mask
 
     // fill out the wraps return vector
     if (cur.row != closest.row && cur.col != closest.col)
-        return out;
+        return {out, facing};
 
     for (int i = 0; i < 4; ++i)
     {
@@ -517,9 +503,18 @@ std::vector<Point> get_wrap2(const Point &cur, const std::map<Point, bool> &mask
         if (dir.col != 0)
             dir.col = dir.col / std::abs(dir.col) * dist;
         out[i] = c1 + dir;
+
+        // find the facing
+        if (mask.contains(cur + directions[i]))
+            continue;
+
+        int new_dir = dir.row == 0;
+        if (!mask.contains(c1 + directions[new_dir]))
+            new_dir += 2;
+        facing[i] = new_dir;
     }
 
-    return out;
+    return {out, facing};
 }
 
 Graph get_graph2(const std::map<Point, bool> mask, int w, int h)
@@ -536,27 +531,39 @@ Graph get_graph2(const std::map<Point, bool> mask, int w, int h)
             if (mask.contains({r, c}) && mask.at({r, c}) == 0)
             {
                 const Point &cur = {r, c};
-                const auto &wrap = get_wrap2(cur, mask, cube, junctions);
+                const auto &[wrap, facing] = get_wrap2(cur, mask, cube, junctions);
                 g.data.insert({cur, get_edges(cur, wrap, mask, w, h)});
+                g.facing.insert({cur, facing});
             }
 
     return g;
 }
 
-std::pair<Point, int> simulate2(const Graph &graph, const std::vector<int> &moves, const Point &start)
+std::pair<Point, int> simulate(const Graph &graph, const std::vector<int> &moves, const Point &start)
 {
     int dir = 0;
     Point pos = start;
 
+    //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
+
     for (int i = 0; i < moves.size() / 2; ++i)
     {
         for (int k = 0; k < moves[2 * i]; ++k)
-            pos = graph.data.at(pos)[dir];
+        {
+            int tmp_dir = dir;
+            dir = graph.facing.at(pos)[tmp_dir];
+            pos = graph.data.at(pos)[tmp_dir];
+            //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
+        }
         dir = (dir + 4 + moves[2 * i + 1]) % 4;
+        //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
     }
 
     for (int k = 0; k < moves.back(); ++k)
+    {
         pos = graph.data.at(pos)[dir];
+        //std::cout << pos.row << ' ' << pos.col << ' ' << dir << '\n';
+    }
 
     return {pos, dir};
 }
@@ -569,7 +576,7 @@ void part_one()
     const auto &moves = get_moves("day22.in");
     const auto &start = get_start(mask);
 
-    const auto &[point, facing] = simulate1(graph, moves, start);
+    const auto &[point, facing] = simulate(graph, moves, start);
     std::cout << (point.row + 1) * 1000 + 4 * (point.col + 1) + facing << '\n';
 }
 
@@ -581,7 +588,7 @@ void part_two()
     const auto &moves = get_moves("day22.in");
     const auto &start = get_start(mask);
 
-    const auto &[point, facing] = simulate2(graph, moves, start);
+    const auto &[point, facing] = simulate(graph, moves, start);
     std::cout << (point.row + 1) * 1000 + 4 * (point.col + 1) + facing << '\n';
 }
 
