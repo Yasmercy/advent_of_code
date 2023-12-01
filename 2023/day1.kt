@@ -6,11 +6,7 @@ fun read_input(name: String) = Path(name).readLines()
 fun filter_digits(data: List<String>): List<List<Int>> {
     return data.map { 
         val digits = it.filter { it.isDigit() }
-        if (digits.isEmpty()) {
-            listOf(0, 0)
-        } else {
-            listOf(digits[0] - '0', digits[digits.length - 1] - '0')
-        }
+        listOf(digits.getOrElse(0, { '0' }) - '0', digits.getOrElse(digits.lastIndex, { '0' }) - '0')
     }
 }
 
@@ -59,9 +55,10 @@ fun part_two() {
     val input = read_input("day1.in")
     val sequence = input.map {
         val numbers = get_numbers(it)
-        num_to_int(numbers[0]) * 10 + num_to_int(numbers[numbers.size - 1])
+        num_to_int(numbers.first()) * 10 + num_to_int(numbers.last())
     }
     val sum = sequence.sumOf {it}
+    println(sum)
 }
 
 fun main() {
