@@ -7,7 +7,7 @@ RUN = kotlin
 day%: day%.jar
 	$(RUN) $^
 
-%.jar: %.kt
+%.jar: utils.kt %.kt
 	$(COMPILE) $@ $^
 
 clean: 
