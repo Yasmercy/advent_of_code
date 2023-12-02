@@ -1,6 +1,3 @@
-import kotlin.io.path.Path
-import kotlin.io.path.readLines
-
 fun filterDigits(data: List<String>): List<List<Int>> {
     return data.map {
         val digits = it.filter { d -> d.isDigit() }
@@ -59,15 +56,6 @@ fun numToInt(num: String): Int {
     return numbers.indexOf(num)
 }
 
-fun partTwo() {
-    val input = readInputs("day1.in")
-    val sequence = input.map {
-        val numbers = getNumbers(it)
-        numToInt(numbers.first()) * 10 + numToInt(numbers.last())
-    }
-    val sum = sequence.sumOf { it }
-    println(sum)
-}
 
 fun main() {
     fun partOne() {

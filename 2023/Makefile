@@ -1,7 +1,7 @@
 COMPILE = kotlinc -include-runtime -d
 RUN = kotlin
 
-.PHONY = clean none day%
+.PHONY = clean none
 .DEFAULT_GOAL := none 
 
 day%: day%.jar
@@ -10,7 +10,7 @@ day%: day%.jar
 %.jar: utils.kt %.kt
 	$(COMPILE) $@ $^
 
-clean: 
+clean:
 	rm -f *.jar
 
 none:

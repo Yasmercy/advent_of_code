@@ -1,12 +1,18 @@
-class Game(private var record: List<List<Int>>) {
-    constructor(line: String) : this(listOf()) {
+class Game(line: String) {
+    companion object {
         val colors = listOf("red", "green", "blue")
+    }
+
+    private val record: List<List<Int>>
+
+    init {
         record = line.split(';').map { l ->
             colors.map { color ->
                 "\\d+ $color".toRegex().find(l)?.value?.split(' ')?.get(0)?.toInt() ?: 0
             }
         }
     }
+
     private fun possibleSet(set: List<Int>, total: List<Int>) =
         set.zip(total) { a, b -> a <= b }.all { it }
 
