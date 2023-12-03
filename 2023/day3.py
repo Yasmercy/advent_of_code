@@ -14,12 +14,12 @@ def multisplit(s: str, delims: list[str]):
         s = it.chain(*[x.split(delim) for x in s])
     return s
 
-def getSymbols(input: list[str]) -> set[tuple[int, int]]:
-    out = set()
+def getSymbols(input: list[str]) -> dict[tuple[int, int], str]:
+    out = {}
     for r, row in enumerate(input):
         for c, char in enumerate(row):
             if isSymbol(char):
-                out.add((r, c))
+                out[(r, c)] = char
     return out
 
 def getDigitStarts(line: str) -> list[int]:
@@ -35,27 +35,35 @@ def getDigitStarts(line: str) -> list[int]:
         cleared += diff
     return starts
 
-def isAdjacent(row: int, col: int, symbols: set[tuple[int, int]]) -> bool:
+def isAdjacent(row: int, col: int, symbols: dict[tuple[int, int], str], gears: dict[tuple[int, int], list[int]], n: int) -> bool:
     for r in range(row - 1, row + 2):
         for c in range(col - 1, col + 2):
+            if symbols.get((r, c), "") == "*":
+                gears[(r, c)] = gears.get((r, c), []) + [n]
             if (r, c) in symbols:
                 return True
     return False
 
-def isAdjacentNum(start: int, end: int, row: int, symbols: set[tuple[int, int]]) -> bool:
-    return any(isAdjacent(row, col, symbols) for col in range(start, end))
+def isAdjacentNum(start: int, end: int, row: int, n: int, symbols: dict[tuple[int, int], str], gears: dict[tuple[int, int], list[int]]) -> bool:
+    return any(isAdjacent(row, col, symbols, gears, n) for col in range(start, end))
 
-def getDigitsAdjacent(line: str, row: int, symbols: set[tuple[int, int]]) -> list[int]:
+def getDigitsAdjacent(line: str, row: int, symbols: dict[tuple[int, int], str], gears: dict[tuple[int, int], list[int]]) -> list[int]:
     digits = [x for x in multisplit(line.strip(), "*$&@+#=/-%*.")]
     digits = [x for x in digits if x]
     starts = getDigitStarts(line)
-    indices = [i for i, c in enumerate(starts) if isAdjacentNum(c, c + len(str(digits[i])), row, symbols)]
+    indices = [i for i, c in enumerate(starts) if isAdjacentNum(c, c + len(str(digits[i])), row, digits[i], symbols, gears)]
     return [int(digits[i]) for i in indices]
 
 def main():
     input = getInput()
     symbols = getSymbols(input)
-    sol = sum([sum(getDigitsAdjacent(input[r], r, symbols)) for r in range(len(input))])
+    gears = {k: v for k, v in symbols if v == "*"}
+
+    sol = sum([sum(getDigitsAdjacent(input[r], r, symbols, gears)) for r in range(len(input))])
     print(sol)
+
+    sol = sum(int(v[0]) * int(v[1]) for v in gears.values() if len(v) == 2)
+    print(sol)
+    
 
 main()
