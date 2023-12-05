@@ -1,13 +1,14 @@
 COMPILE = kotlinc -include-runtime -d
 RUN = kotlin
 
-.PHONY = clean none
-.DEFAULT_GOAL := none 
+.PRECIOUS: day%.jar
+.PHONY: day% clean none
+.DEFAULT_GOAL := none
 
 day%: day%.jar
 	$(RUN) $^
 
-%.jar: utils.kt %.kt
+day%.jar: utils.kt day%.kt
 	$(COMPILE) $@ $^
 
 clean:
@@ -15,3 +16,4 @@ clean:
 
 none:
 	echo "make day{n}"
+
