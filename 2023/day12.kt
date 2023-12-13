@@ -37,8 +37,8 @@ fun main() {
     }
 
     fun partTwo() {
-        val newRecords = records.map { line -> line + '?' + line + '?' + line + '?' + line + '?' + line }
-        val newGroups = groups.map { line -> line + line + line + line + line }
+        val newRecords = records.map { line -> joinList(line, 5, '?') }
+        val newGroups = groups.map { line -> line * 5 }
         val counts = newRecords.zip(newGroups).sumOf { (r, g) -> getSolution(r, g) }
         println(counts)
     }
