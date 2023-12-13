@@ -1,11 +1,9 @@
 fun main() {
     fun solve(i: Int, k: Int, record: List<Char>, groups: List<Int>): Int {
-        println("$i $k")
-
         // base case: index validation
         // if there is no more input, return whether finished
         if (i >= record.size)
-            return (k == groups.size).toInt()
+            return 0
 
         // base case: no groups
         if (k == groups.size)
@@ -24,13 +22,18 @@ fun main() {
                 continue
 
             // ensure spacer after (if more groups)
-            if (k == groups.size - 1 || record[start + size] == '.' || record[start + size] == '?')
+            if (record[start + size] != '#')
                 sum += solve(start + size + 1, k + 1, record, groups)
         }
 
         // edge case where ending group is used
-        if (k == groups.size - 1 && record.slice(record.size - size..<record.size).all {it != '.'})
+        if (k == groups.size - 1 && (i..record.size - size).any { start ->
+                record.slice(start..<start + size).all { it != '.' } &&
+                        record.slice(start + size..<record.size).all { it != '#' }
+            }
+        ) {
             sum += 1
+        }
 
         return sum
     }
@@ -40,9 +43,10 @@ fun main() {
     val groups = inputs.map { line -> getAllNums(line.split(' ')[1]).map { it.toInt() } }
 
     fun partOne() {
-        val sol = records.zip(groups).map { (r, g) ->
+        val counts = records.zip(groups).map { (r, g) ->
             solve(0, 0, r, g)
         }
+        val sol = counts.sum()
         println(sol)
     }
 
