@@ -103,10 +103,9 @@ fun main() {
         }
 
         val sol = getLoad(grid, height)
-        displayGrid(grid, width, height)
         println(sol)
     }
 
-    // partOne()
+    partOne()
     partTwo()
 }

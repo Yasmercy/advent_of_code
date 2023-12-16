@@ -34,10 +34,9 @@ fun main() {
     }
 
     fun createGroups(inputs: List<String>): List<List<List<String>>> {
-        val out = mutableListOf<List<List<List<String>>>>()
+        // should do this with reading file and splitting by '\n\n'
         val splits = inputs.withIndex().filter { it.value.isEmpty() }.map { it.index }
         val divisions = listOf(-1) + splits + listOf(inputs.size)
-
         return divisions.windowed(2).map {
             inputs.slice(it[0] + 1..<it[1])
         }.chunked(2)
@@ -45,18 +44,16 @@ fun main() {
 
     val inputs = readInputs("day13.in")
     val groups = createGroups(inputs)
-    println(groups[1])
-
 
     fun partOne() {
-        val first = inputs.slice(0..6)
-        val second = inputs.slice(8..<inputs.size)
-
-        val c = symmetricHor(first) + 1
-        val r = symmetricVert(second) + 1
-        val sol = 100 * r + c
+        var sol = 0
+        for (group in groups) {
+            val c = symmetricHor(group[0]) + 1
+            val r = symmetricVert(group[1]) + 1
+            sol += 100 * r + c
+        }
         println(sol)
     }
 
-    // partOne()
+    partOne()
 }
