@@ -6,6 +6,8 @@ fun main() {
     fun splitBetweenIndex(s: String, index: Int): String {
         // 012345, (1) 1.5 -> 0123
         // 012345, (3) 3.5 -> 2345
+        // 01234, (1) 1.5 -> 0123
+        // 01234, (3) 3.5 -> 2345
         val leftDistance = index
         val rightDistance = s.length - index - 2
         val dist = min(leftDistance, rightDistance)
@@ -13,22 +15,19 @@ fun main() {
     }
 
     fun symmetricHor(inputs: List<String>): Int {
-        for (i in 0..inputs[0].length)
-            if (inputs.all { isPalindrome(splitBetweenIndex(it, i)) })
-                return i
+        for (i in 0..<inputs[0].length - 1) if (inputs.all { isPalindrome(splitBetweenIndex(it, i)) }) return i
         return -1
     }
 
     fun symmetricVert(inputs: List<String>): Int {
         val length = inputs[0].length
-        for (i in 0..inputs.size) {
+        for (i in 0..<inputs.size - 1) {
             val strings = (0..<length).map { c ->
                 inputs.indices.map { r ->
                     inputs[r][c]
                 }.joinToString("")
             }
-            if (strings.all { isPalindrome(splitBetweenIndex(it, i)) })
-                return i
+            if (strings.all { isPalindrome(splitBetweenIndex(it, i)) }) return i
         }
         return -1
     }
@@ -42,16 +41,20 @@ fun main() {
         }.chunked(2)
     }
 
+    fun getValues(groups: List<List<List<String>>>) = groups.map { group ->
+        val c1 = symmetricHor(group[0]) + 1
+        val r1 = symmetricVert(group[0]) + 1
+        val c2 = symmetricHor(group[1]) + 1
+        val r2 = symmetricVert(group[1]) + 1
+        100 * (r1 + r2) + c1 + c2
+    }
+
     val inputs = readInputs("day13.in")
     val groups = createGroups(inputs)
 
     fun partOne() {
-        var sol = 0
-        for (group in groups) {
-            val c = symmetricHor(group[0]) + 1
-            val r = symmetricVert(group[1]) + 1
-            sol += 100 * r + c
-        }
+        val values = getValues(groups)
+        val sol = values.sum()
         println(sol)
     }
 
