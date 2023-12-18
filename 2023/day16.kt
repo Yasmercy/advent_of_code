@@ -42,26 +42,34 @@ fun main() {
         }
     }
 
-    fun partOne() {
+    fun getEnergized(start: Beam): Int {
         val seen = mutableSetOf<Beam>()
-        val beams = mutableListOf(Beam(0, Pair(0, -1)))
+        val beams = mutableListOf(start)
         val pos = mutableSetOf<Pair<Int, Int>>()
 
         while (beams.isNotEmpty()) {
             iterateBeam(beams.removeLast(), beams, seen, pos)
         }
 
-        // for (i in map.indices) {
-        //     for (j in map[0].indices) {
-        //         if (pos.contains(Pair(i, j))) print('#')
-        //         else print('.')
-        //     }
-        //     println()
-        // }
+        return pos.size - 1
 
-        val sol = pos.size - 1
+    }
+
+    fun partOne() {
+        val sol = getEnergized(Beam(0, Pair(0, -1)))
+        println(sol)
+    }
+
+    fun partTwo() {
+        val east = (map.indices).map { getEnergized(Beam(0, Pair(it, -1))) }
+        val west = (map.indices).map { getEnergized(Beam(2, Pair(it, map[0].size))) }
+        val south = (map[0].indices).map { getEnergized(Beam(1, Pair(-1, it))) }
+        val north = (map[0].indices).map { getEnergized(Beam(3, Pair(map.size, it))) }
+
+        val sol = listOf(east.max(), west.max(), south.max(), north.max()).max()
         println(sol)
     }
 
     partOne()
+    partTwo()
 }
