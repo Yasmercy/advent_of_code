@@ -49,6 +49,6 @@ fun main() {
         println(sol)
     }
 
-    // partOne()
+    partOne()
     partTwo()
 }
