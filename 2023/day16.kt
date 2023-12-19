@@ -52,7 +52,6 @@ fun main() {
         }
 
         return pos.size - 1
-
     }
 
     fun partOne() {
