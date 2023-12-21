@@ -1,6 +1,8 @@
 import kotlin.io.path.Path
 import kotlin.io.path.readLines
 
+typealias Point = Pair<Int, Int>
+
 fun readInputs(name: String) = Path(name).readLines()
 fun Boolean.toInt() = if (this) 1 else 0
 fun inBounds(x: Int, lower: Int, higher: Int) =

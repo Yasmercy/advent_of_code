@@ -1,8 +1,6 @@
 import java.util.PriorityQueue
 import kotlin.math.max
 
-typealias Point = Pair<Int, Int>
-
 fun main() {
     val map = readInputs("day17.in").map { it.toList() }
     val width = map[0].size
