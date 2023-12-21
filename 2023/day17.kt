@@ -1,14 +1,13 @@
 import java.util.PriorityQueue
-import kotlin.math.min
 
 typealias Point = Pair<Int, Int>
 
 fun main() {
     data class Item(val dist: Int, val loc: Point, val prev: Point, val straight: Int) : Comparable<Item> {
         override fun compareTo(other: Item) = compareValuesBy(this, other) { it.dist }
-        override fun equals(other: Any?) =
-            other is Item && this.loc == other.loc && this.prev == other.prev && this.straight == other.straight
     }
+
+    data class HashItem(val loc: Point, val prev: Point, val straight: Int)
 
     val map = readInputs("day17.in").map { it.toList() }
     val width = map[0].size
@@ -24,16 +23,26 @@ fun main() {
         Point(cur.loc.first - (cur.loc.first - cur.prev.first), cur.loc.second - (cur.loc.second - cur.prev.second))
 
     fun solve(): Int {
+        val start = Item(0, Pair(0, 0), Pair(0, 0), 0)
         val queue = PriorityQueue<Item>()
-        val seen = mutableSetOf<Item>()
-        queue.add(Item(0, Pair(0, 0), Pair(0, 0), 0))
+        val seen = mutableSetOf<HashItem>()
+        val queued = mutableSetOf(HashItem(start.loc, start.prev, start.straight))
+        queue.add(start)
+
+        var iter = 0
 
         while (!queue.isEmpty()) {
-            val cur = queue.poll()
-            if (cur.loc == end) return cur.dist
+            if (++iter % 1_000_000 == 0) {
+                println("${queue.size} ${queued.size} ${seen.size}")
+            }
 
-            if (seen.contains(cur)) continue
-            seen.add(cur)
+            val cur = queue.poll()
+            if (cur.loc == end) {
+                return cur.dist
+            }
+
+            if (seen.contains(HashItem(cur.loc, cur.prev, cur.straight))) continue
+            seen.add(HashItem(cur.loc, cur.prev, cur.straight))
 
             val front = getFront(cur)
             val back = getBack(cur)
@@ -48,8 +57,16 @@ fun main() {
                 if (outBounds(next) || next == back || (next == front && cur.straight == 2)) continue
                 val weight = map[next.first][next.second] - '0'
 
-                if (next == front) queue.add(Item(cur.dist + weight, next, cur.loc, cur.straight + 1))
-                else queue.add(Item(cur.dist + weight, next, cur.loc, 0))
+                val nextFront = Item(cur.dist + weight, next, cur.loc, cur.straight + 1)
+                val nextSide = Item(cur.dist + weight, next, cur.loc, 0)
+                if (next == front && !queued.contains(HashItem(next, cur.loc, cur.straight + 1))) {
+                    queue.add(nextFront)
+                    queued.add(HashItem(next, cur.loc, cur.straight + 1))
+                }
+                else if (!queued.contains(HashItem(next, cur.loc, 0))) {
+                    queue.add(nextSide)
+                    queued.add(HashItem(next, cur.loc, 0))
+                }
             }
         }
 
