@@ -1,6 +1,7 @@
 fun main() {
     data class Instruction(val dir: Int, val n: Int)
     data class Point(val row: Int, val col: Int)
+    data class Line(val start: Point, val end: Point, val dir: Int, val orient: Int)
 
     fun toDir(c: Char) = when (c) {
         'R' -> 0
@@ -18,7 +19,7 @@ fun main() {
         var x = 0
         var place = 1
         var digits = listOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
-        for (i in 1..<s.length - 1) {
+        for (i in 1..<s.length) {
             x += digits.indexOf(s[s.length - i]) * place
             place *= 16
         }
@@ -32,93 +33,42 @@ fun main() {
         Instruction(dir, n)
     }
 
-    fun drawPath(instructions: List<Instruction>): List<Point> {
+    fun createLine(start: Point, i1: Instruction, i2: Instruction): Line {
         val directions = listOf(Point(0, 1), Point(1, 0), Point(0, -1), Point(-1, 0))
+        val dir = directions[i1.dir]
+        val end = Point(start.row + i1.n * dir.row, start.col + i1.n * dir.col)
+        return Line(start, end, i1.dir, i2.dir)
+    }
+
+    fun getLines(instructions: List<Instruction>): List<Line> {
         var cur = Point(0, 0)
-        val out = mutableListOf(cur)
-
-        for (instruct in instructions) {
-            val dir = directions[instruct.dir]
-            for (i in 0..<instruct.n) {
-                cur = Point(cur.row + dir.row, cur.col + dir.col)
-                out.add(cur)
-            }
+        var out = instructions.windowed(2).map {
+            val line = createLine(cur, it[0], it[1])
+            cur = line.end
+            line
         }
-
-        return out
+        val last = createLine(cur, instructions.last(), instructions.first())
+        return out + listOf(last)
     }
 
-    fun toIndex(p: Point, width: Int) = p.row * width + p.col
-
-    fun find(ds: MutableList<Int>, a: Int): Int {
-        while (ds[a] >= 0) {
-            val out = find(ds, ds[a])
-            ds[a] = out
-            return out
-        }
-        return a
+    fun orientedInside(h1: Line, h2: Line, v1: Line, v2: Line): Boolean {
+        return false
     }
-
-    fun union(ds: MutableList<Int>, a: Int, b: Int) {
-        // union by size (smaller into larger)
-        val keyA = find(ds, a)
-        val keyB = find(ds, b)
-
-        if (keyA == keyB) return
-
-        if (ds[keyA] < ds[keyB]) {
-            ds[keyB] += ds[keyA]
-            ds[keyA] = keyB
-        } else {
-            ds[keyA] += ds[keyB]
-            ds[keyB] = keyA
-        }
-    }
-
-    fun outBounds(p: Point, w: Int, h: Int) = !inBounds(p.row, 0, h - 1) || !inBounds(p.col, 0, w - 1)
 
     fun solve(instructions: List<Instruction>): Int {
-        val path = drawPath(instructions)
-        val minRow = path.minBy { it.row }.row
-        val maxRow = path.maxBy { it.row }.row
-        val minCol = path.minBy { it.col }.col
-        val maxCol = path.maxBy { it.col }.col
-        val height = maxRow - minRow + 1
-        val width = maxCol - minCol + 1
+        val lines = getLines(instructions)
+        val hor = lines.filter {line -> (line.dir % 2) == 0}.sortedBy { it.start.col }
+        val ver = lines.filter {line -> (line.dir % 2) == 1}.sortedBy { it.start.row }
 
-        // place the path in a rectangular grid with one unit of buffer
-        val bufHeight = height + 2
-        val bufWidth = width + 2
-        val walls = path.map { point ->
-            Point(point.row + 1 - minRow, point.col + 1 - minCol)
-        }
-
-        // find connected components (add all neighbors to same component excluding walls)
-        val ds = MutableList(bufHeight * bufWidth) { -1 }
-
-        // connect walls
-        val wallIndex = toIndex(walls[0], bufWidth)
-        for (point in walls) union(ds, wallIndex, toIndex(point, bufWidth))
-
-        // connect everything else
-        val neighbor = listOf(Point(1, 0), Point(0, 1), Point(-1, 0), Point(0, -1))
-        for (row in 0..<bufHeight) {
-            for (col in 0..<bufWidth) {
-                val cur = Point(row, col)
-                val curIndex = toIndex(cur, bufWidth)
-                if (find(ds, curIndex) == find(ds, wallIndex)) continue
-                for (n in neighbor) {
-                    val p = Point(row + n.row, col + n.col)
-                    if (!outBounds(p, bufWidth, bufHeight) && find(ds, toIndex(p, bufWidth)) != find(ds, wallIndex))
-                        union(ds, toIndex(p, bufWidth), curIndex)
-
-                }
+        // for each rectangle
+        // if the orientation is correct, add the area of the rectangle
+        val area = hor.windowed(2).flatMap { (h1, h2) ->
+            ver.windowed(2).map { (v1, v2) ->
+                0
             }
         }
 
-        // count interior by exclusion
-        val sol = ds.size + ds[find(ds, 0)]
-        return sol
+        return area.sum()
     }
 
     val inputs = readInputs("day18.in")
@@ -129,12 +79,6 @@ fun main() {
         println(sol)
     }
 
-    fun partTwo() {
-        val instructions = getInstructions2(inputs)
-        val sol = solve(instructions)
-        println(sol)
-    }
-
     partOne()
-    partTwo()
+    // partTwo()
 }
