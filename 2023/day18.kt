@@ -2,15 +2,15 @@ import kotlin.math.max
 import kotlin.math.min
 
 fun main() {
-    data class Instruction(val dir: Int, val n: Int)
-    data class Point(val row: Int, val col: Int)
+    data class Instruction(val dir: Int, val n: Long)
+    data class Point(val row: Long, val col: Long)
     data class Line(val start: Point, val end: Point, val dir: Int, val orient: Int)
 
-    fun Pair<Int, Int>.min(): Int {
+    fun Pair<Long, Long>.min(): Long {
         return min(this.first, this.second)
     }
 
-    fun Pair<Int, Int>.max(): Int {
+    fun Pair<Long, Long>.max(): Long {
         return max(this.first, this.second)
     }
 
@@ -23,15 +23,15 @@ fun main() {
 
     fun getInstructions1(inputs: List<String>) = inputs.map {
         val split = it.split(' ')
-        Instruction(toDir(split[0][0]), split[1].toInt())
+        Instruction(toDir(split[0][0]), split[1].toLong())
     }
 
-    fun fromHex(s: String): Int {
-        var x = 0
-        var place = 1
+    fun fromHex(s: String): Long {
+        var x = 0L
+        var place = 1L
         var digits = listOf('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
         for (i in 1..<s.length) {
-            x += digits.indexOf(s[s.length - i]) * place
+            x += digits.indexOf(s[s.length - i]).toLong() * place
             place *= 16
         }
         return x
@@ -45,14 +45,14 @@ fun main() {
     }
 
     fun createLine(start: Point, orient: Int, i1: Instruction, i2: Instruction): Line {
-        val directions = listOf(Point(0, 1), Point(1, 0), Point(0, -1), Point(-1, 0))
+        val directions = listOf(Point(0L, 1), Point(1, 0L), Point(0L, -1), Point(-1, 0L))
         val dir = directions[i1.dir]
         val end = Point(start.row + i1.n * dir.row, start.col + i1.n * dir.col)
         return Line(start, end, i1.dir, orient)
     }
 
     fun getLines(instructions: List<Instruction>): List<Line> {
-        var cur = Point(0, 0)
+        var cur = Point(0L, 0L)
         var orient = instructions[0].dir + 1
         var out = instructions.windowed(2).map { (i1, i2) ->
             val line = createLine(cur, orient, i1, i2)
@@ -64,7 +64,7 @@ fun main() {
         return out + listOf(last)
     }
 
-    fun rectangleCorners(top: Line, bot: Line, left: Line, right: Line): List<Int> {
+    fun rectangleCorners(top: Line, bot: Line, left: Line, right: Line): List<Long> {
         val r1 = top.start.row
         val r2 = bot.start.row
         val c1 = left.start.col
@@ -72,12 +72,12 @@ fun main() {
         return listOf(r1, c1, r2, c2)
     }
 
-    fun contains(smaller: Pair<Int, Int>, larger: Pair<Int, Int>): Boolean {
+    fun contains(smaller: Pair<Long, Long>, larger: Pair<Long, Long>): Boolean {
         return larger.min() <= smaller.min() && larger.max() >= smaller.max()
     }
 
     fun orientedInside(top: Line, bot: Line, left: Line, right: Line): Boolean {
-        // [1, 3, 0, 2] are inward orientations
+        // [1, 3, 0L, 2] are inward orientations
         val (r1, c1, r2, c2) = rectangleCorners(top, bot, left, right)
 
         val topIn = top.orient == 1 || !contains(Pair(c1, c2), Pair(top.start.col, top.end.col))
@@ -88,8 +88,7 @@ fun main() {
         return topIn && botIn && leftIn && rightIn
     }
 
-    fun solve(instructions: List<Instruction>): Int {
-        val lines = getLines(instructions)
+    fun getRectangles(lines: List<Line>): List<List<Long>> {
         val hor = lines.filter { line -> (line.dir % 2) == 0 }.sortedBy { it.start.row }
         val ver = lines.filter { line -> (line.dir % 2) == 1 }.sortedBy { it.start.col }
 
@@ -103,20 +102,71 @@ fun main() {
             }
         }.map { (a, b, c, d) -> rectangleCorners(a, b, c, d) }.filter { (r1, c1, r2, c2) -> r1 != r2 && c1 != c2 }
 
-        val sides = mutableMapOf<List<Int>, Int>()
-        var area = 0
+        // brute force area
+        // val rMin = rectangles.minOf {(r1, c1, r2, c2) -> min(r1, r2)}
+        // val rMax = rectangles.maxOf {(r1, c1, r2, c2) -> max(r1, r2)}
+        // val cMin = rectangles.minOf {(r1, c1, r2, c2) -> min(c1, c2)}
+        // val cMax = rectangles.maxOf {(r1, c1, r2, c2) -> max(c1, c2)}
+
+        // val grid = MutableList(rMax - rMin + 1L) { MutableList(cMax - cMin + 1L) { false } }
+        // var count = 0L
+        // for ((r1, c1, r2, c2) in rectangles) {
+        //     for (r in r1..r2) {
+        //         for (c in c1..c2) {
+        //             count += 1 - grid[r - rMin][c - cMin].toLong()
+        //             grid[r - rMin][c - cMin] = true
+        //         }
+        //     }
+        // }
+        // println("Real area = $count")
+        // println(grid.map {it.map {if (it) "#" else "."}.joinToString("")}.joinToString("\n"))
+
+        return rectangles
+    }
+
+    fun getAreaRectangles(rectangles: List<List<Long>>): Long {
+        val sides = mutableMapOf<List<Long>, Long>()
+        val points = mutableMapOf<Pair<Long, Long>, Long>()
+        var area = 0L
+
+        val rMin = rectangles.minOf {(r1, c1, r2, c2) -> min(r1, r2)}
+        val cMin = rectangles.minOf {(r1, c1, r2, c2) -> min(c1, c2)}
+
+        // add all areas
         for ((r1, c1, r2, c2) in rectangles) {
-            sides[listOf(r1, c1, r1, c2)] = (sides.get(listOf(r1, c1, r1, c2)) ?: 0) + 1
-            sides[listOf(r2, c1, r2, c2)] = (sides.get(listOf(r2, c1, r2, c2)) ?: 0) + 1
-            sides[listOf(r1, c1, r2, c1)] = (sides.get(listOf(r1, c1, r2, c1)) ?: 0) + 1
-            sides[listOf(r1, c2, r2, c2)] = (sides.get(listOf(r1, c2, r2, c2)) ?: 0) + 1
-            area += (c2 - c1 + 1) * (r2 - r1 + 1)
+            points[Pair(r1, c1)] = (points.get(Pair(r1, c1)) ?: 0L) + 1L
+            points[Pair(r2, c2)] = (points.get(Pair(r2, c2)) ?: 0L) + 1L
+            points[Pair(r1, c2)] = (points.get(Pair(r1, c2)) ?: 0L) + 1L
+            points[Pair(r2, c1)] = (points.get(Pair(r2, c1)) ?: 0L) + 1L
+            sides[listOf(r1, c1, r1, c2)] = (sides.get(listOf(r1, c1, r1, c2)) ?: 0L) + 1L
+            sides[listOf(r2, c1, r2, c2)] = (sides.get(listOf(r2, c1, r2, c2)) ?: 0L) + 1L
+            sides[listOf(r1, c1, r2, c1)] = (sides.get(listOf(r1, c1, r2, c1)) ?: 0L) + 1L
+            sides[listOf(r1, c2, r2, c2)] = (sides.get(listOf(r1, c2, r2, c2)) ?: 0L) + 1L
+            area += (c2 - c1 + 1L) * (r2 - r1 + 1L)
         }
 
+        // exclude all duplicate sides
         for ((side, count) in sides) {
             val (r1, c1, r2, c2) = side
-            area -= (count - 1) * (r2 + c2 - r1 - c1 + 1)
+            area -= (count - 1) * (r2 + c2 - r1 - c1 + 1L)
+            // if (count > 1) println("$side ${(r2 + c2 - r1 - c1 + 1L)}")
         }
+
+        // include all overcounted points
+        for (count in points.values) {
+            if (count == 4L) area += 1L
+        }
+
+        return area
+    }
+
+    fun solve(instructions: List<Instruction>): Long {
+        val lines = getLines(instructions)
+        val rectangles = getRectangles(lines)
+        val area = getAreaRectangles(rectangles)
+
+        // println(rectangles.joinToString("\n"))
+        // println(grid.map {it.map {if (it) "#" else "."}.joinToString("")}.joinToString("\n"))
 
         return area
     }
@@ -129,6 +179,12 @@ fun main() {
         println(sol)
     }
 
+    fun partTwo() {
+        val instructions = getInstructions2(inputs)
+        val sol = solve(instructions)
+        println(sol)
+    }
+
     partOne()
-    // partTwo()
+    partTwo()
 }
