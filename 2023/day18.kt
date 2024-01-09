@@ -44,7 +44,7 @@ fun main() {
         Instruction(dir, n)
     }
 
-    fun createLine(start: Point, orient: Int, i1: Instruction, i2: Instruction): Line {
+    fun createLine(start: Point, orient: Int, i1: Instruction): Line {
         val directions = listOf(Point(0L, 1), Point(1, 0L), Point(0L, -1), Point(-1, 0L))
         val dir = directions[i1.dir]
         val end = Point(start.row + i1.n * dir.row, start.col + i1.n * dir.col)
@@ -55,12 +55,12 @@ fun main() {
         var cur = Point(0L, 0L)
         var orient = instructions[0].dir + 1
         var out = instructions.windowed(2).map { (i1, i2) ->
-            val line = createLine(cur, orient, i1, i2)
+            val line = createLine(cur, orient, i1)
             cur = line.end
             orient = (orient + i2.dir - i1.dir + 4) % 4
             line
         }
-        val last = createLine(cur, orient, instructions.last(), instructions.first())
+        val last = createLine(cur, orient, instructions.last())
         return out + listOf(last)
     }
 
@@ -76,14 +76,57 @@ fun main() {
         return larger.min() <= smaller.min() && larger.max() >= smaller.max()
     }
 
-    fun orientedInside(top: Line, bot: Line, left: Line, right: Line): Boolean {
-        // [1, 3, 0L, 2] are inward orientations
-        val (r1, c1, r2, c2) = rectangleCorners(top, bot, left, right)
+    fun horParity(line: Line, ver: List<Line>, rectangle: List<Long>): Boolean {
+        // odd number of vertical lines between endpoint and rectangle
+        val (r1, c1, r2, c2) = rectangle
+        val (r, l) = Pair(max(line.start.col, line.end.col), min(line.start.col, line.end.col))
+        val (b, t) = Pair(max(line.start.row, line.end.row), min(line.start.row, line.end.row))
+        return if (r <= c1) {
+            ver.count {it.start.col in (r+1)..<c1 && contains(Pair(r1, r2), Pair(b, t))} % 2 == 1
+        } else if (l >= c2) {
+            ver.count {it.start.col in (c2 + 1)..<l && contains(Pair(r1, r2), Pair(b, t))} % 2 == 1
+        } else {
+            println("dying")
+            false
+        }
+    }
 
-        val topIn = top.orient == 1 || !contains(Pair(c1, c2), Pair(top.start.col, top.end.col))
-        val botIn = bot.orient == 3 || !contains(Pair(c1, c2), Pair(bot.start.col, bot.end.col))
-        val leftIn = left.orient == 0 || !contains(Pair(r1, r2), Pair(left.start.row, left.end.row))
-        val rightIn = right.orient == 2 || !contains(Pair(r1, r2), Pair(right.start.row, right.end.row))
+    fun verParity(line: Line, hor: List<Line>, rectangle: List<Long>): Boolean {
+        // odd number of horizontal lines between endpoint and rectangle
+        val (r1, c1, r2, c2) = rectangle
+        val (r, l) = Pair(max(line.start.col, line.end.col), min(line.start.col, line.end.col))
+        val (b, t) = Pair(max(line.start.row, line.end.row), min(line.start.row, line.end.row))
+        return if (r1 >= b) {
+            hor.count {it.start.row in (b + 1)..<r1 && contains(Pair(c1, c2), Pair(r, l))} % 2 == 1
+        } else if (t >= r2) {
+            hor.count {it.start.col in (r2 + 1)..<t && contains(Pair(c1, c2), Pair(r, l))} % 2 == 1
+        } else {
+            println("dying")
+            false
+        }
+    }
+
+    fun validHorExtension(line: Line, hor: List<Line>, rectangle: List<Long>): Boolean {
+        val (_, c1, _, c2) = rectangle
+        if (!contains(Pair(c1, c2), Pair(line.start.col, line.end.col)) && !horParity(line, hor, rectangle)) {
+            println("$line $rectangle")
+        }
+        return !contains(Pair(c1, c2), Pair(line.start.col, line.end.col)) && horParity(line, hor, rectangle)
+    }
+
+    fun validVerExtension(line: Line, ver: List<Line>, rectangle: List<Long>): Boolean {
+        val (r1, _, r2, _) = rectangle
+        return !contains(Pair(r1, r2), Pair(line.start.row, line.end.row)) && verParity(line, ver, rectangle)
+    }
+
+    fun orientedInside(top: Line, bot: Line, left: Line, right: Line, hor: List<Line>, ver: List<Line>): Boolean {
+        // [1, 3, 0, 2] are inward orientations
+        val rectangle = rectangleCorners(top, bot, left, right)
+
+        val topIn = top.orient == 1 || validHorExtension(top, ver, rectangle)
+        val botIn = bot.orient == 3 || validHorExtension(bot, ver, rectangle)
+        val leftIn = left.orient == 0 || validVerExtension(left, hor, rectangle)
+        val rightIn = right.orient == 2 || validVerExtension(right, hor, rectangle)
 
         return topIn && botIn && leftIn && rightIn
     }
@@ -93,32 +136,36 @@ fun main() {
         val ver = lines.filter { line -> (line.dir % 2) == 1 }.sortedBy { it.start.col }
 
         // for each rectangle
-        // if the orientation is correct, add the area of the rectangle
+        // if the orientation and parity are orrect, add the area of the rectangle
         val rectangles = hor.windowed(2).flatMap { (top, bot) ->
             ver.windowed(2).filter { (left, right) ->
-                orientedInside(top, bot, left, right)
+                orientedInside(top, bot, left, right, hor, ver)
             }.map { (left, right) ->
-                listOf(top, bot, left, right)
-            }
-        }.map { (a, b, c, d) -> rectangleCorners(a, b, c, d) }.filter { (r1, c1, r2, c2) -> r1 != r2 && c1 != c2 }
+                rectangleCorners(top, bot, left, right)
+            }.filter { (r1, c1, r2, c2) -> r1 != r2 && c1 != c2 }
+        }
 
         // brute force area
-        // val rMin = rectangles.minOf {(r1, c1, r2, c2) -> min(r1, r2)}
-        // val rMax = rectangles.maxOf {(r1, c1, r2, c2) -> max(r1, r2)}
-        // val cMin = rectangles.minOf {(r1, c1, r2, c2) -> min(c1, c2)}
-        // val cMax = rectangles.maxOf {(r1, c1, r2, c2) -> max(c1, c2)}
+        val rMin = hor.first().start.row.toInt()
+        val rMax = hor.last().start.row.toInt()
+        val cMin = ver.first().start.col.toInt()
+        val cMax = ver.last().start.col.toInt()
 
-        // val grid = MutableList(rMax - rMin + 1L) { MutableList(cMax - cMin + 1L) { false } }
-        // var count = 0L
-        // for ((r1, c1, r2, c2) in rectangles) {
-        //     for (r in r1..r2) {
-        //         for (c in c1..c2) {
-        //             count += 1 - grid[r - rMin][c - cMin].toLong()
-        //             grid[r - rMin][c - cMin] = true
-        //         }
-        //     }
-        // }
-        // println("Real area = $count")
+        val grid = MutableList(rMax - rMin + 1) { MutableList(cMax - cMin + 1) { false } }
+        var count = 0
+        for ((r1, c1, r2, c2) in rectangles) {
+            val r1 = r1.toInt()
+            val r2 = r2.toInt()
+            val c1 = c1.toInt()
+            val c2 = c2.toInt()
+            for (r in r1..r2) {
+                for (c in c1..c2) {
+                    count += 1 - grid[r - rMin][c - cMin].toInt()
+                    grid[r - rMin][c - cMin] = true
+                }
+            }
+        }
+        println("Real area = $count")
         // println(grid.map {it.map {if (it) "#" else "."}.joinToString("")}.joinToString("\n"))
 
         return rectangles
@@ -129,8 +176,8 @@ fun main() {
         val points = mutableMapOf<Pair<Long, Long>, Long>()
         var area = 0L
 
-        val rMin = rectangles.minOf {(r1, c1, r2, c2) -> min(r1, r2)}
-        val cMin = rectangles.minOf {(r1, c1, r2, c2) -> min(c1, c2)}
+        val rMin = rectangles.minOf { (r1, c1, r2, c2) -> min(r1, r2) }
+        val cMin = rectangles.minOf { (r1, c1, r2, c2) -> min(c1, c2) }
 
         // add all areas
         for ((r1, c1, r2, c2) in rectangles) {
@@ -186,5 +233,5 @@ fun main() {
     }
 
     partOne()
-    partTwo()
+    // partTwo()
 }
