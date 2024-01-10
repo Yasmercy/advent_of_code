@@ -5,8 +5,7 @@ typealias Point = Pair<Int, Int>
 
 fun readInputs(name: String) = Path(name).readLines()
 fun Boolean.toInt() = if (this) 1 else 0
-fun inBounds(x: Int, lower: Int, higher: Int) =
-    x in lower..higher
+fun inBounds(x: Int, lower: Int, higher: Int) = x in lower..higher
 
 fun getAllNums(line: String) = "-?\\d+".toRegex().findAll(line).map { it.value.toLong() }.toList()
 
