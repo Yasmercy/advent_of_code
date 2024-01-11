@@ -34,5 +34,5 @@ fun gcd(a: Long, b: Long): Long {
 }
 
 fun gcd(a: BigInteger, b: BigInteger): BigInteger {
-    return if (a.equals(0) || b.equals(0)) (a + b) else gcd(b, a - b * (a / b))
+    return if (a == 0.toBigInteger() || b == 0.toBigInteger()) (a + b) else gcd(b, a - b * (a / b))
 }

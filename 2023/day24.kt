@@ -1,7 +1,7 @@
-import kotlin.math.abs
+import java.math.BigInteger
 
 fun main() {
-    class Rational(top: Long, bot: Long) {
+    class Rational(top: BigInteger, bot: BigInteger) {
         val num = makeNum(top, bot)
         val denom = makeDenom(top, bot)
 
@@ -11,28 +11,35 @@ fun main() {
 
         override fun equals(other: Any?) = (other is Rational) && this.num == other.num && this.denom == other.denom
 
-        private fun makeNum(top: Long, bot: Long) = abs(top) / gcd(abs(top), abs(bot))
-        private fun makeDenom(top: Long, bot: Long) = bot * (if (top < 0) -1 else 1) / gcd(abs(top), abs(bot))
+        fun sign(x: BigInteger): BigInteger {
+            if (x < BigInteger("0")) return BigInteger("-1")
+            if (x > BigInteger("0")) return BigInteger("1")
+            return BigInteger("0")
+        }
+
+        private fun makeNum(top: BigInteger, bot: BigInteger) = top.abs() / gcd(top.abs(), bot.abs())
+        private fun makeDenom(top: BigInteger, bot: BigInteger) = bot * sign(top) / gcd(top.abs(), bot.abs())
     }
 
-    operator fun Rational.compareTo(other: Long) = this.num.compareTo(other * denom) * (if (denom < 0) -1 else 1)
-    operator fun Long.compareTo(other: Rational) = -other.compareTo(this)
-    operator fun Rational.times(other: Long) = Rational(this.num * other, this.denom)
-    operator fun Rational.plus(other: Long) = Rational(this.num + this.denom * other, this.denom)
 
-    data class Vector2D(val x: Long, val y: Long)
+    operator fun Rational.compareTo(other: BigInteger) = this.num.compareTo(other * denom) * sign(denom).toInt()
+    operator fun BigInteger.compareTo(other: Rational) = -other.compareTo(this)
+    operator fun Rational.times(other: BigInteger) = Rational(this.num * other, this.denom)
+    operator fun Rational.plus(other: BigInteger) = Rational(this.num + this.denom * other, this.denom)
+
+    data class Vector2D(val x: BigInteger, val y: BigInteger)
     data class Line2D(val start: Vector2D, val dir: Vector2D)
-    data class Vector3D(val x: Long, val y: Long, val z: Long)
+    data class Vector3D(val x: BigInteger, val y: BigInteger, val z: BigInteger)
     data class Line3D(val start: Vector3D, val dir: Vector3D)
 
     operator fun <T> List<T>.component6() = this[5]
 
-    fun createLine(nums: List<Long>): Line3D {
+    fun createLine(nums: List<BigInteger>): Line3D {
         val (x, y, z, dx, dy, dz) = nums
         return Line3D(Vector3D(x, y, z), Vector3D(dx, dy, dz))
     }
 
-    fun aliasLines(v1: Line2D, v2: Line2D): List<Long> {
+    fun aliasLines(v1: Line2D, v2: Line2D): List<BigInteger> {
         val a = v1.dir.x
         val b = v1.dir.y
         val c = -v2.dir.x
@@ -45,9 +52,9 @@ fun main() {
     fun infIntersections(v1: Line2D, v2: Line2D): Boolean {
         val (a, b, c, d, x, y) = aliasLines(v1, v2)
 
-        if ((a * d - b * c) != 0L) return false
-        if (x == 0L && y == 0L) return true
-        if (x == 0L || y == 0L) return false
+        if ((a * d - b * c) != BigInteger("0")) return false
+        if (x == BigInteger("0") && y == BigInteger("0")) return true
+        if (x == BigInteger("0") || y == BigInteger("0")) return false
         if (Rational(b, a) == Rational(d, c)) return Rational(b, a) == Rational(y, x)
         if (Rational(c, a) == Rational(d, b)) return Rational(b, a) == Rational(y, x)
         return false
@@ -55,7 +62,7 @@ fun main() {
 
     fun noIntersections(v1: Line2D, v2: Line2D): Boolean {
         val (a, b, c, d, _, _) = aliasLines(v1, v2)
-        return ((a * d - b * c) == 0L) && !infIntersections(v1, v2)
+        return ((a * d - b * c) == BigInteger("0")) && !infIntersections(v1, v2)
     }
 
     fun intersection(v1: Line2D, v2: Line2D): Pair<Rational, Rational> {
@@ -108,7 +115,7 @@ fun main() {
     }
 
     val inputs = readInputs("day24.in")
-    val lines = inputs.map { createLine(getAllNums(it)) }
+    val lines = inputs.map { createLine(getAllNums(it).map { x -> x.toBigInteger() }) }
 
     fun partOne() {
         val lines2D = lines.map { line ->
@@ -119,8 +126,8 @@ fun main() {
         //     Line2D(Vector2D(18, 19), Vector2D(-1, -1)),
         // )
 
-        val min = 200000000000000L
-        val max = 400000000000000L
+        val min = 200000000000000L.toBigInteger()
+        val max = 400000000000000L.toBigInteger()
         var sol = 0
 
         for (i in lines2D.indices) {
@@ -140,29 +147,28 @@ fun main() {
 
                 // if (t >= 0 && s >= 0) println("$x1 $y1")
 
-                if (t < 0 || s < 0) continue
-
-                if (t >= 0 && s >= 0 && min <= x1 && x1 <= max && min <= y1 && y1 <= max) ++sol
+                if (t < 0.toBigInteger() || s < 0.toBigInteger()) continue
+                if (min <= x1 && x1 <= max && min <= y1 && y1 <= max) ++sol
             }
         }
         println(sol)
     }
 
-    fun partTwo() {
-        val min = 7L
-        val max = 27L
-        var sol = 0
+    // fun partTwo() {
+    //     val min = 7L
+    //     val max = 27L
+    //     var sol = 0
 
-        for (v1 in lines) {
-            for (v2 in lines) {
-                if (v1 == v2) continue
-                val intersection = intersectLines(v1, v2) ?: continue
-                println(intersection)
-                if (intersection.all { min <= it && it <= max }) ++sol
-            }
-        }
-        println(sol)
-    }
+    //     for (v1 in lines) {
+    //         for (v2 in lines) {
+    //             if (v1 == v2) continue
+    //             val intersection = intersectLines(v1, v2) ?: continue
+    //             println(intersection)
+    //             if (intersection.all { min <= it && it <= max }) ++sol
+    //         }
+    //     }
+    //     println(sol)
+    // }
 
     partOne()
 }
