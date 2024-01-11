@@ -29,9 +29,6 @@ fun iterateForward(start: String, graph: Graph, commands: List<Char>, ends: Set<
     return index
 }
 
-fun gcd(a: Long, b: Long): Long {
-    return if (a == 0L || b == 0L) (a + b) else gcd(b, a - b * (a / b))
-}
 
 fun lcm(a: Long, b: Long) = (a * b) / gcd(a, b)
 

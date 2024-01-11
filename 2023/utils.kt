@@ -1,3 +1,4 @@
+import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.io.path.readLines
 
@@ -26,4 +27,12 @@ operator fun <T> List<T>.times(index: Int): List<T> {
         out += this
     }
     return out.toList()
+}
+
+fun gcd(a: Long, b: Long): Long {
+    return if (a == 0L || b == 0L) (a + b) else gcd(b, a - b * (a / b))
+}
+
+fun gcd(a: BigInteger, b: BigInteger): BigInteger {
+    return if (a.equals(0) || b.equals(0)) (a + b) else gcd(b, a - b * (a / b))
 }
