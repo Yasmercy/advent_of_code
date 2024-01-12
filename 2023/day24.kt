@@ -51,7 +51,6 @@ fun main() {
 
     fun infIntersections(v1: Line2D, v2: Line2D): Boolean {
         val (a, b, c, d, x, y) = aliasLines(v1, v2)
-
         if ((a * d - b * c) != BigInteger("0")) return false
         if (x == BigInteger("0") && y == BigInteger("0")) return true
         if (x == BigInteger("0") || y == BigInteger("0")) return false
@@ -61,7 +60,7 @@ fun main() {
     }
 
     fun noIntersections(v1: Line2D, v2: Line2D): Boolean {
-        val (a, b, c, d, _, _) = aliasLines(v1, v2)
+        val (a, b, c, d) = aliasLines(v1, v2)
         return ((a * d - b * c) == BigInteger("0")) && !infIntersections(v1, v2)
     }
 
@@ -80,40 +79,6 @@ fun main() {
         return Pair(px, py)
     }
 
-    fun intersectLines(a: Line3D, b: Line3D): List<Rational>? {
-        val pairs = listOf(
-            Pair(
-                Line2D(Vector2D(a.start.x, a.start.y), Vector2D(a.dir.x, a.dir.y)),
-                Line2D(Vector2D(b.start.x, b.start.y), Vector2D(b.dir.x, b.dir.y))
-            ), Pair(
-                Line2D(Vector2D(a.start.x, a.start.z), Vector2D(a.dir.x, a.dir.z)),
-                Line2D(Vector2D(b.start.x, b.start.z), Vector2D(b.dir.x, b.dir.z))
-            ), Pair(
-                Line2D(Vector2D(a.start.y, a.start.z), Vector2D(a.dir.y, a.dir.z)),
-                Line2D(Vector2D(b.start.y, b.start.z), Vector2D(b.dir.y, b.dir.z))
-            )
-        )
-
-        if (pairs.any { (v1, v2) -> noIntersections(v1, v2) }) return null
-        if (pairs.all { (v1, v2) -> infIntersections(v1, v2) }) {
-            println("dying")
-            return null
-        }
-
-        val intersections =
-            pairs.filterNot { (v1, v2) -> infIntersections(v1, v2) }.map { (v1, v2) -> intersection(v1, v2) }
-
-        if (intersections.any { parametric -> parametric != intersections[0] }) return null
-
-        val (t, s) = intersections[0]
-        val p1 = listOf(t * a.dir.x + a.start.x, t * a.dir.y + a.start.y, t * a.dir.z + a.start.z)
-        val p2 = listOf(s * b.dir.x + b.start.x, s * b.dir.y + b.start.y, s * b.dir.z + b.start.z)
-        if (p1 != p2) {
-            println("dying")
-        }
-        return p1
-    }
-
     val inputs = readInputs("day24.in")
     val lines = inputs.map { createLine(getAllNums(it).map { x -> x.toBigInteger() }) }
 
@@ -121,10 +86,6 @@ fun main() {
         val lines2D = lines.map { line ->
             Line2D(Vector2D(line.start.x, line.start.y), Vector2D(line.dir.x, line.dir.y))
         }
-        // val lines2D = listOf(
-        //     Line2D(Vector2D(19, 13), Vector2D(-2, 1)),
-        //     Line2D(Vector2D(18, 19), Vector2D(-1, -1)),
-        // )
 
         val min = 200000000000000L.toBigInteger()
         val max = 400000000000000L.toBigInteger()
@@ -136,16 +97,6 @@ fun main() {
                 if (v1 == v2 || noIntersections(v1, v2)) continue
                 val (t, s) = intersection(v1, v2)
                 val (x1, y1) = getVector(v1, t)
-                val (x2, y2) = getVector(v2, s)
-
-                if (x1 != x2 || y1 != y2) {
-                    // println("$v1 $v2 $t $s")
-                    // println("$x1 $x2 $y1 $y2 ${x1 != x2} ${y1 != y2}")
-                    println("BAD")
-                    continue
-                }
-
-                // if (t >= 0 && s >= 0) println("$x1 $y1")
 
                 if (t < 0.toBigInteger() || s < 0.toBigInteger()) continue
                 if (min <= x1 && x1 <= max && min <= y1 && y1 <= max) ++sol
@@ -154,22 +105,5 @@ fun main() {
         println(sol)
     }
 
-    // fun partTwo() {
-    //     val min = 7L
-    //     val max = 27L
-    //     var sol = 0
-
-    //     for (v1 in lines) {
-    //         for (v2 in lines) {
-    //             if (v1 == v2) continue
-    //             val intersection = intersectLines(v1, v2) ?: continue
-    //             println(intersection)
-    //             if (intersection.all { min <= it && it <= max }) ++sol
-    //         }
-    //     }
-    //     println(sol)
-    // }
-
     partOne()
 }
-
