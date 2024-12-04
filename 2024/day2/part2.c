@@ -37,55 +37,53 @@ vector *read_data(char *filename)
     return ret;
 }
 
-/* returns 0 for good, -1 for bad, and positive for the position to remove */
-int is_approx_all_increasing(vector *vec)
+int is_all_increasing(vector *vec)
 {
-    int error_pos = 0;
-    int error_count = 0;
-    for (size_t i = 0; i < vec->size - 1 && error_count < 2; ++i)
-    {
+    for (size_t i = 0; i < vec->size - 1; ++i)
         if (vec->head[i + 1] <= vec->head[i])
-        {
-            error_pos = i + 1;
-            ++error_count;
-        }
-    }
-
-    return error_count < 2 ? error_pos : -1;
+            return 0;
+    return 1;
 }
 
-/* returns 0 for good, -1 for bad, and positive for the position to remove */
-int is_approx_all_decreasing(vector *vec)
+int is_all_decreasing(vector *vec)
 {
-    int error_pos = 0;
-    int error_count = 0;
-    for (size_t i = 0; i < vec->size - 1 && error_count < 2; ++i)
-    {
+    for (size_t i = 0; i < vec->size - 1; ++i)
         if (vec->head[i + 1] >= vec->head[i])
-        {
-            error_pos = i + 1;
-            ++error_count;
-        }
-    }
-
-    return error_count < 2 ? error_pos : -1;
+            return 0;
+    return 1;
 }
 
-/* returns 0 for good, -1 for bad, and positive for the position to remove */
-int is_approx_adjacent_close(vector *vec)
+int is_adjacent_close(vector *vec)
 {
-    int error_pos = 0;
-    int error_count = 0;
-    for (size_t i = 0; i < vec->size - 1 && error_count < 2; ++i)
-    {
+    for (size_t i = 0; i < vec->size - 1; ++i)
         if (diff(vec->head[i + 1], vec->head[i]) > 3)
-        {
-            error_pos = i + 1;
-            error_count = error_count + 1 + (i < vec->size - 2 && diff(vec->head[i + 2], vec->head[i]) > 3);
-        }
-    }
+            return 0;
+    return 1;
+}
 
-    return error_count < 2 ? error_pos : -1;
+int is_safe(vector *row)
+{
+    return (is_all_increasing(row) || is_all_decreasing(row)) && is_adjacent_close(row);
+}
+
+int is_approximate_safe(vector *row)
+{
+    if (is_safe(row))
+        return 1;
+
+    // try approximate
+    vector *rem = vector_create(row->size - 1);
+    for (size_t i = 0; i < row->size; ++i)
+    {
+        for (size_t j = 0; j < row->size; ++j)
+        {
+            if (j != i)
+                vector_set(rem, j - (j > i), vector_get(row, j));
+        }
+        if (is_safe(rem))
+            return 1;
+    }
+    return 0;
 }
 
 int main(void)
@@ -96,12 +94,7 @@ int main(void)
     for (size_t i = 0; i < data->size; ++i)
     {
         vector *row = vector_get(data, i);
-        int inc = is_approx_all_increasing(row);
-        int dec = is_approx_all_decreasing(row);
-        int cls = is_approx_adjacent_close(row);
-
-        int safe = (inc != -1 && cls != -1 && (inc == cls || inc * cls == 0)) ||
-                   (dec != -1 && cls != -1 && (dec == cls || dec * cls == 0));
+        int safe = is_approximate_safe(row);
         count += safe;
     }
 
