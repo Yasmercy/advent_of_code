@@ -2,10 +2,11 @@
 
 #include <stdlib.h>
 
-typedef struct vector {
-  size_t size;
-  size_t capacity;
-  void **head;
+typedef struct vector
+{
+    size_t size;
+    size_t capacity;
+    void **head;
 } vector;
 
 /* constructor (NULL initialized) */
@@ -28,3 +29,12 @@ void vector_set(vector *vec, size_t pos, void *ele);
 
 /* index */
 void *vector_get(vector *vec, size_t pos);
+
+/* contains */
+int vector_contains(vector *vec, void *ele);
+
+/* string split by char */
+vector *string_split(char *line, char sep);
+
+/* split a set of ints by char */
+vector *vector_split_ints(char *line, char sep);

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 
 #include "../includes/vector.h"
 
@@ -50,4 +51,44 @@ void vector_set(vector *vec, size_t pos, void *ele)
 void *vector_get(vector *vec, size_t pos)
 {
     return vec->head[pos];
+}
+
+int vector_contains(vector *vec, void *ele)
+{
+    for (size_t i = 0; i < vec->size; ++i)
+    {
+        if (vector_get(vec, i) == ele)
+            return 1;
+    }
+    return 0;
+}
+
+vector *string_split(char *line, char sep)
+{
+    vector *vec = vector_create(0);
+    char *next = NULL;
+    while ((next = strchr(line, sep)) != NULL)
+    {
+        *next = '\0';
+        vector_push(vec, line);
+        line = next + 1;
+    }
+
+    vector_push(vec, line);
+    return vec;
+}
+
+vector *vector_split_ints(char *line, char sep)
+{
+    vector *vec = vector_create(0);
+    char *next = NULL;
+    while ((next = strchr(line, sep)) != NULL)
+    {
+        *next = '\0';
+        vector_push(vec, (void *)(size_t)atoi(line));
+        line = next + 1;
+    }
+
+    vector_push(vec, (void *)(size_t)atoi(line));
+    return vec;
 }
