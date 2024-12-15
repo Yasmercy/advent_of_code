@@ -49,4 +49,5 @@ int main(void)
     }
 
     printf("sum is %zu\n", sum);
+    fclose(f);
 }
