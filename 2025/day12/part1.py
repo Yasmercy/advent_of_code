@@ -1,7 +1,6 @@
 import itertools as it
 
 import numpy as np
-from scipy import optimize
 
 
 def get_shapes(rows):
@@ -18,47 +17,10 @@ def get_shapes(rows):
 
 
 def check_feasible(m, n, reqs, bitmasks):
-    n_rots = 8
-    n_shape = len(reqs)
-
-    vars = [
-        (s, r, i, j)
-        for s in range(n_shape)
-        for r in range(n_rots)
-        for i in range(m - 2)
-        for j in range(n - 2)
-    ]
-
-    collisions = [
-        [
-            (0 <= i - a <= 2 and 0 <= j - b <= 2) and bitmasks[s][r][i - a, j - b]
-            for (s, r, a, b) in vars
-        ]
-        for i in range(m)
-        for j in range(n)
-    ]
-    budgets = [[shape == s for (s, *_) in vars] for shape in range(n_shape)]
-
-    bounds = optimize.Bounds(0, 1)
-    integrality = np.ones(len(vars), dtype=np.bool)
-
-    A = np.array(collisions + budgets)
-    lb = np.array([0] * (m * n) + reqs)
-    ub = np.array([1] * (m * n) + reqs)
-    constraints = optimize.LinearConstraint(
-        A=A,
-        lb=lb,
-        ub=ub,
-    )
-
-    result = optimize.milp(
-        c=np.ones(len(vars)),
-        constraints=constraints,
-        integrality=integrality,
-        bounds=bounds,
-    )
-
-    return result.status != 2
+    possible = (m - (m % 3)) * (n - (n % 3)) >= sum(reqs) * 9
+    impossible = sum(r * sum(b[0].ravel()) for r, b in zip(reqs, bitmasks)) > m * n
+    assert possible or impossible
+    return possible
 
 
 def main():
@@ -70,16 +32,12 @@ def main():
 
     count = 0
     for line in chunks[-1]:
-        # for line in [chunks[-1][2]]:
         dims, reqs = line.split(":")
         m, n = [int(x) for x in dims.strip().split("x")]
         reqs = [int(x) for x in reqs.strip().split(" ")]
 
         if check_feasible(m, n, reqs, shapes):
             count += 1
-
-        print("hi")
-        break
 
     print(count)
 
